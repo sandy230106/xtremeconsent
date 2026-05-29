@@ -1,0 +1,2595 @@
+"use client";
+
+import Image from "next/image";
+
+import {
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
+import {
+  LayoutDashboard,
+  Users,
+  FileText,
+  Settings,
+  Search,
+  Pencil,
+  Trash2,
+  Download,
+  Plus,
+  Save,
+  X,
+  Upload,
+} from "lucide-react";
+
+import jsPDF from "jspdf";
+
+import { supabase } from "../../lib/supabase";
+
+/* =========================
+   TYPES
+========================= */
+
+type ServiceType =
+  | "Tattoo"
+  | "PMU"
+  | "Piercing"
+  | "Tattoo Removal";
+
+type ClientData = {
+  id?: number;
+
+  form_no: string;
+
+  consent_date?: string;
+
+  service_type: ServiceType;
+
+  pmu_service?: string;
+
+  name: string;
+
+  dob: string;
+
+  age: string;
+
+  gender: string;
+
+  occupation: string;
+
+  phone: string;
+
+  address: string;
+
+  idProof: string;
+
+
+  needleType?: string;
+
+  payment_mode?: string;
+
+  price?: string;
+
+  questionnaire?: Record<
+    string,
+    string
+  >;
+
+  notes?: string;
+
+  customer_signature?: string;
+
+  artist_signature?: string;
+
+  client_photo?: string;
+
+  created_at?: string;
+};
+
+type ConsentQuestion = {
+  id: string;
+
+  service_type: string;
+
+  question_en: string;
+
+  question_ta: string;
+};
+
+type TabType =
+  | "dashboard"
+  | "clients"
+  | "content"
+  | "settings";
+
+/* =========================
+   PAGE
+========================= */
+
+export default function AdminPage() {
+
+  const [tab,
+    setTab,
+  ] = useState<TabType>(
+    "dashboard"
+  );
+
+  const [clients,
+    setClients,
+  ] = useState<
+    ClientData[]
+  >([]);
+
+  const [loading,
+    setLoading,
+  ] = useState(true);
+
+  const [search,
+    setSearch,
+  ] = useState("");
+
+  const [serviceFilter,
+    setServiceFilter,
+  ] = useState("All");
+
+  const [editing,
+    setEditing,
+  ] = useState(false);
+
+  const [
+    selectedClient,
+    setSelectedClient,
+  ] =
+    useState<ClientData | null>(
+      null
+    );
+
+  const [questions,
+    setQuestions,
+  ] = useState<
+    ConsentQuestion[]
+  >([]);
+
+  const [
+    selectedService,
+    setSelectedService,
+  ] = useState(
+    "Tattoo"
+  );
+
+  const [
+    newQuestion,
+    setNewQuestion,
+  ] = useState({
+    question_en:
+      "",
+    question_ta:
+      "",
+  });
+
+  const [
+    studioSettings,
+    setStudioSettings,
+  ] = useState({
+    studio_name:
+      "XTREME TATTOO STUDIO",
+
+    phone:
+      "7010343009",
+
+    address:
+      "VIGNESH PLAZA, 12A, 1st Floor, Thillainagar Main Road, Trichy – 620018",
+  });
+
+  /* =========================
+     FETCH CLIENTS
+  ========================= */
+
+  const fetchClients =
+    async () => {
+
+      try {
+
+        const response =
+          await fetch(
+            "/api/consent"
+          );
+
+        const data =
+          await response.json();
+
+        setClients(
+          data || []
+        );
+
+      } catch (
+        error
+      ) {
+
+        console.error(
+          error
+        );
+
+      } finally {
+
+        setLoading(
+          false
+        );
+      }
+    };
+
+  /* =========================
+     FETCH QUESTIONS
+  ========================= */
+
+  const fetchQuestions =
+    async () => {
+
+      const {
+        data,
+        error,
+      } =
+        await supabase
+          .from(
+            "consent_questions"
+          )
+          .select("*");
+
+      if (
+        error
+      ) {
+
+        console.error(
+          error
+        );
+
+        return;
+      }
+
+      setQuestions(
+        data || []
+      );
+    };
+
+  useEffect(() => {
+
+    const timer =
+      window.setTimeout(() => {
+        fetchClients();
+
+        fetchQuestions();
+      }, 0);
+
+    return () =>
+      window.clearTimeout(
+        timer
+      );
+
+  }, []);
+
+  /* =========================
+     FILTERED CLIENTS
+  ========================= */
+
+  const filteredClients =
+    useMemo(() => {
+
+      return clients.filter(
+        (
+          client
+        ) => {
+
+          const query =
+            search.toLowerCase();
+
+          const matchesSearch =
+
+            client.name
+              ?.toLowerCase()
+              .includes(
+                query
+              ) ||
+
+            client.phone
+              ?.toLowerCase()
+              .includes(
+                query
+              ) ||
+
+            client.form_no
+              ?.toLowerCase()
+              .includes(
+                query
+              );
+
+          const matchesService =
+
+            serviceFilter ===
+            "All"
+
+              ? true
+
+              : client.service_type ===
+                serviceFilter;
+
+          return (
+            matchesSearch &&
+            matchesService
+          );
+        }
+      );
+
+    }, [
+      clients,
+      search,
+      serviceFilter,
+    ]);
+
+  const totalRevenue =
+    useMemo(
+      () =>
+        clients.reduce(
+          (total, client) =>
+            total +
+            Number(
+              client.price || 0
+            ),
+          0
+        ),
+      [clients]
+    );
+  return (
+    <main className="flex min-h-screen flex-col bg-[#050505] text-white lg:flex-row">
+
+      {/* SIDEBAR */}
+      <aside className="w-full border-b border-[#D4AF37]/10 bg-[#0a0a0a] p-4 sm:p-6 lg:w-[290px] lg:border-b-0 lg:border-r">
+
+        {/* LOGO */}
+        <div className="border-b border-[#D4AF37]/10 pb-5 lg:pb-8">
+
+          <Image
+            src="/logo.jpg"
+            alt="logo"
+            width={180}
+            height={90}
+            className="mx-auto h-auto object-contain"
+          />
+
+          <h1 className="mt-4 text-center text-2xl font-black uppercase tracking-[3px] lg:mt-6 lg:text-[30px]">
+
+            XTREME
+
+            <span className="block text-[#D4AF37]">
+
+              ADMIN
+
+            </span>
+
+          </h1>
+
+          <p className="mt-2 text-center text-sm text-neutral-500">
+
+            Consent Dashboard
+
+          </p>
+
+        </div>
+
+        {/* MENU */}
+        <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:mt-8 lg:block lg:space-y-3">
+
+          <SidebarButton
+            label="Dashboard"
+            icon={
+              <LayoutDashboard
+                size={20}
+              />
+            }
+            active={
+              tab ===
+              "dashboard"
+            }
+            onClick={() =>
+              setTab(
+                "dashboard"
+              )
+            }
+          />
+
+          <SidebarButton
+            label="Clients"
+            icon={
+              <Users
+                size={20}
+              />
+            }
+            active={
+              tab ===
+              "clients"
+            }
+            onClick={() =>
+              setTab(
+                "clients"
+              )
+            }
+          />
+
+          <SidebarButton
+            label="Consent Content Editor"
+            icon={
+              <FileText
+                size={20}
+              />
+            }
+            active={
+              tab ===
+              "content"
+            }
+            onClick={() =>
+              setTab(
+                "content"
+              )
+            }
+          />
+
+          <SidebarButton
+            label="Settings"
+            icon={
+              <Settings
+                size={20}
+              />
+            }
+            active={
+              tab ===
+              "settings"
+            }
+            onClick={() =>
+              setTab(
+                "settings"
+              )
+            }
+          />
+
+        </div>
+      </aside>
+
+      {/* MAIN */}
+      <section className="flex-1 overflow-auto p-4 sm:p-6 lg:p-8">
+
+        {/* DASHBOARD */}
+        {tab ===
+          "dashboard" && (
+
+          <div>
+
+            <h2 className="text-4xl font-black sm:text-[52px]">
+
+              Dashboard
+
+            </h2>
+
+            <p className="mt-2 text-neutral-500">
+
+              Overview of all consent forms
+
+            </p>
+
+            <div className="mt-8 grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
+
+              <StatCard
+                title="Total Forms"
+                value={
+                  clients.length
+                }
+              />
+
+              <StatCard
+                title="Tattoo"
+                value={
+                  clients.filter(
+                    (
+                      c
+                    ) =>
+                      c.service_type ===
+                      "Tattoo"
+                  ).length
+                }
+              />
+
+              <StatCard
+                title="PMU"
+                value={
+                  clients.filter(
+                    (
+                      c
+                    ) =>
+                      c.service_type ===
+                      "PMU"
+                  ).length
+                }
+              />
+
+              <StatCard
+                title="Piercing"
+                value={
+                  clients.filter(
+                    (
+                      c
+                    ) =>
+                      c.service_type ===
+                      "Piercing"
+                  ).length
+                }
+              />
+
+              <StatCard
+                title="Revenue"
+                value={`₹${totalRevenue.toLocaleString(
+                  "en-IN"
+                )}`}
+              />
+
+              <StatCard
+                title="Cash"
+                value={
+                  clients.filter(
+                    (c) =>
+                      c.payment_mode ===
+                      "Cash"
+                  ).length
+                }
+              />
+
+              <StatCard
+                title="GPay"
+                value={
+                  clients.filter(
+                    (c) =>
+                      c.payment_mode ===
+                      "GPay"
+                  ).length
+                }
+              />
+
+              <StatCard
+                title="Card"
+                value={
+                  clients.filter(
+                    (c) =>
+                      c.payment_mode ===
+                      "Card"
+                  ).length
+                }
+              />
+
+            </div>
+
+          </div>
+        )}
+
+        {/* CLIENTS */}
+        {tab ===
+          "clients" && (
+
+          <div>
+
+            {/* HEADER */}
+            <div className="flex flex-col lg:flex-row justify-between gap-5">
+
+              <div>
+
+                <h2 className="text-4xl font-black sm:text-[52px]">
+
+                  Clients
+
+                </h2>
+
+                <p className="mt-2 text-neutral-500">
+
+                  Manage client consent forms
+
+                </p>
+
+              </div>
+
+              {/* SEARCH */}
+              <div className="relative w-full lg:w-[420px]">
+
+                <Search
+                  size={18}
+                  className="absolute left-4 top-1/2 -translate-y-1/2 text-neutral-500"
+                />
+
+                <input
+                  placeholder="Search name, phone, consent no..."
+                  value={
+                    search
+                  }
+                  onChange={(
+                    e
+                  ) =>
+                    setSearch(
+                      e.target
+                        .value
+                    )
+                  }
+                  className="w-full rounded-[22px] border border-[#D4AF37]/10 bg-[#111111] py-4 pl-12 pr-5 outline-none"
+                />
+
+              </div>
+
+            </div>
+
+            {/* FILTERS */}
+            <div className="mt-7 flex flex-wrap gap-3">
+
+              {[
+                "All",
+                "Tattoo",
+                "PMU",
+                "Piercing",
+                "Tattoo Removal",
+              ].map(
+                (
+                  item
+                ) => (
+                  <button
+                    key={item}
+                    onClick={() =>
+                      setServiceFilter(
+                        item
+                      )
+                    }
+                    className={
+                      serviceFilter ===
+                      item
+                        ? "rounded-full px-6 py-3 font-semibold bg-[#D4AF37] text-black"
+                        : "rounded-full px-6 py-3 font-semibold border border-[#D4AF37]/10 bg-[#111111]"
+                    }
+                  >
+                    {item}
+                  </button>
+                )
+              )}
+
+            </div>
+
+            {/* TABLE */}
+            <div className="mt-8 overflow-x-auto rounded-[24px] border border-[#D4AF37]/10 bg-[#0d0d0d] sm:rounded-[32px]">
+
+              {/* TABLE HEAD */}
+              <div className="grid min-w-[900px] grid-cols-12 border-b border-[#D4AF37]/10 bg-[#141414] px-6 py-5 text-xs font-bold uppercase tracking-[2px] text-[#D4AF37]">
+
+                <div className="col-span-2">
+
+                  Consent No
+
+                </div>
+
+                <div className="col-span-2">
+
+                  Name
+
+                </div>
+
+                <div className="col-span-2">
+
+                  Service
+
+                </div>
+
+                <div className="col-span-2">
+
+                  Phone
+
+                </div>
+
+                <div className="col-span-2">
+
+                  Date
+
+                </div>
+
+                <div className="col-span-2 text-center">
+
+                  Actions
+
+                </div>
+
+              </div>
+              {/* LOADING */}
+              {loading && (
+                <div className="py-20 text-center text-neutral-500">
+
+                  Loading...
+
+                </div>
+              )}
+
+              {/* EMPTY */}
+              {!loading &&
+                filteredClients.length ===
+                  0 && (
+                  <div className="py-20 text-center text-neutral-500">
+
+                    No clients found
+
+                  </div>
+                )}
+
+              {/* CLIENT ROWS */}
+              {!loading &&
+                filteredClients.map(
+                  (
+                    client,
+                    index
+                  ) => (
+
+                    <div
+                      key={
+                        client.id ??
+                        index
+                      }
+                      className="grid min-w-[900px] grid-cols-12 items-center border-b border-[#D4AF37]/10 px-6 py-5 transition hover:bg-[#141414]"
+                    >
+
+                      {/* CONSENT */}
+                      <div className="col-span-2 font-semibold">
+
+                        {
+                          client.form_no
+                        }
+
+                      </div>
+
+                      {/* NAME */}
+                      <div className="col-span-2 flex items-center gap-3">
+                        {client.client_photo ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={client.client_photo}
+                            alt={client.name}
+                            className="h-10 w-10 rounded-full object-cover border border-[#D4AF37]/30 flex-shrink-0"
+                          />
+                        ) : (
+                          <div className="h-10 w-10 rounded-full bg-neutral-850 border border-neutral-800 flex items-center justify-center text-[10px] text-neutral-400 font-black uppercase flex-shrink-0">
+                            {client.name ? client.name.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase() : "N/A"}
+                          </div>
+                        )}
+                        <div>
+                          <p className="font-semibold">
+                            {client.name}
+                          </p>
+                          <p className="text-xs text-neutral-500">
+                            Age: {client.age}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* SERVICE */}
+                      <div className="col-span-2">
+
+                        <span className="rounded-full bg-[#D4AF37]/10 px-4 py-2 text-sm text-[#D4AF37]">
+
+                          {
+                            client.service_type
+                          }
+
+                        </span>
+
+                      </div>
+
+                      {/* PHONE */}
+                      <div className="col-span-2 text-neutral-300">
+
+                        {
+                          client.phone
+                        }
+
+                      </div>
+
+                      {/* DATE */}
+                      <div className="col-span-2 text-sm text-neutral-500">
+
+                        {client.created_at
+                          ? new Date(
+                              client.created_at
+                            ).toLocaleDateString()
+                          : "--"}
+
+                      </div>
+
+                      {/* ACTIONS */}
+                      <div className="col-span-2 flex justify-center gap-3">
+
+                        {/* EDIT */}
+                        <button
+                          onClick={() => {
+
+                            setSelectedClient(
+                              client
+                            );
+
+                            setEditing(
+                              true
+                            );
+                          }}
+                          className="rounded-full bg-[#D4AF37]/10 p-3 text-[#D4AF37] transition hover:scale-105"
+                        >
+
+                          <Pencil
+                            size={18}
+                          />
+
+                        </button>
+
+                        {/* PDF */}
+                        <button
+                          onClick={() => {
+                            try {
+                              downloadConsentPdf(
+                                client
+                              );
+                            } catch (error) {
+                              console.error(
+                                error
+                              );
+
+                              alert(
+                                "Could not download the PDF. Please try again."
+                              );
+                            }
+                          }}
+                          className="rounded-full bg-blue-500/10 p-3 text-blue-400 transition hover:scale-105"
+                        >
+
+                          <Download
+                            size={18}
+                          />
+
+                        </button>
+
+                        {/* DELETE */}
+                        <button
+                          onClick={async () => {
+
+                            const ok =
+                              confirm(
+                                `Delete ${client.name}?`
+                              );
+
+                            if (
+                              !ok
+                            )
+                              return;
+
+                            await fetch(
+                              `/api/consent?id=${client.id}`,
+                              {
+                                method:
+                                  "DELETE",
+                              }
+                            );
+
+                            fetchClients();
+                          }}
+                          className="rounded-full bg-red-500/10 p-3 text-red-400 transition hover:scale-105"
+                        >
+
+                          <Trash2
+                            size={18}
+                          />
+
+                        </button>
+
+                      </div>
+
+                    </div>
+                  )
+                )}
+
+            </div>
+          </div>
+        )}
+        {/* EDIT MODAL */}
+        {editing &&
+          selectedClient && (
+
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-5">
+
+            <div className="w-full max-w-6xl max-h-[95vh] overflow-y-auto rounded-[36px] border border-[#D4AF37]/10 bg-[#0b0b0b]">
+
+              {/* HEADER */}
+              <div className="sticky top-0 z-10 flex items-center justify-between border-b border-[#D4AF37]/10 bg-[#141414] px-8 py-6">
+
+                <div>
+
+                  <h2 className="text-[34px] font-black uppercase">
+
+                    Edit Client
+
+                  </h2>
+
+                  <p className="mt-2 text-neutral-500">
+
+                    Update consent details
+
+                  </p>
+
+                </div>
+
+                <button
+                  onClick={() =>
+                    setEditing(
+                      false
+                    )
+                  }
+                  className="rounded-full bg-red-500/10 p-3 text-red-400"
+                >
+                  <X
+                    size={20}
+                  />
+                </button>
+
+              </div>
+
+              {/* BODY */}
+              <div className="p-8">
+
+                {/* CLIENT DETAILS */}
+                <div className="rounded-[30px] border border-[#D4AF37]/10 bg-[#121212] p-8">
+
+                  <h3 className="mb-8 text-[28px] font-black uppercase">
+
+                    Client Details
+
+                  </h3>
+
+                  <div className="flex flex-col lg:flex-row gap-8 items-start">
+                    <div className="flex-1 w-full grid md:grid-cols-2 gap-5">
+                      <AdminInput
+                        label="Consent No"
+                        value={
+                          selectedClient.form_no
+                        }
+                        onChange={(
+                          value
+                        ) =>
+                          setSelectedClient({
+                            ...selectedClient,
+                            form_no:
+                              value,
+                          })
+                        }
+                      />
+
+                      <AdminInput
+                        label="Consent Date"
+                        type="date"
+                        value={
+                          selectedClient.consent_date ||
+                          (selectedClient.created_at
+                            ? new Date(
+                                selectedClient.created_at
+                              )
+                                .toISOString()
+                                .split(
+                                  "T"
+                                )[0]
+                            : "")
+                        }
+                        onChange={(
+                          value
+                        ) =>
+                          setSelectedClient({
+                            ...selectedClient,
+                            consent_date:
+                              value,
+                          })
+                        }
+                      />
+
+                      <AdminInput
+                        label="Client Name"
+                        value={
+                          selectedClient.name
+                        }
+                        onChange={(
+                          value
+                        ) =>
+                          setSelectedClient({
+                            ...selectedClient,
+                            name:
+                              value,
+                          })
+                        }
+                      />
+
+                      <AdminInput
+                        label="Phone"
+                        value={
+                          selectedClient.phone
+                        }
+                        onChange={(
+                          value
+                        ) =>
+                          setSelectedClient({
+                            ...selectedClient,
+                            phone:
+                              value,
+                          })
+                        }
+                      />
+
+                      <AdminInput
+                        label="DOB"
+                        type="date"
+                        value={
+                          selectedClient.dob
+                        }
+                        onChange={(
+                          value
+                        ) =>
+                          setSelectedClient({
+                            ...selectedClient,
+                            dob:
+                              value,
+                          })
+                        }
+                      />
+
+                      <AdminInput
+                        label="Age"
+                        value={
+                          selectedClient.age
+                        }
+                        onChange={(
+                          value
+                        ) =>
+                          setSelectedClient({
+                            ...selectedClient,
+                            age:
+                              value,
+                          })
+                        }
+                      />
+
+                      <AdminInput
+                        label="Occupation"
+                        value={
+                          selectedClient.occupation
+                        }
+                        onChange={(
+                          value
+                        ) =>
+                          setSelectedClient({
+                            ...selectedClient,
+                            occupation:
+                              value,
+                          })
+                        }
+                      />
+
+                      <AdminSelect
+                        label="Gender"
+                        value={
+                          selectedClient.gender
+                        }
+                        options={[
+                          "Male",
+                          "Female",
+                          "Other",
+                        ]}
+                        onChange={(
+                          value
+                        ) =>
+                          setSelectedClient({
+                            ...selectedClient,
+                            gender:
+                              value,
+                          })
+                        }
+                      />
+
+                      <AdminSelect
+                        label="Service"
+                        value={
+                          selectedClient.service_type
+                        }
+                        options={[
+                          "Tattoo",
+                          "PMU",
+                          "Piercing",
+                          "Tattoo Removal",
+                        ]}
+                        onChange={(
+                          value
+                        ) =>
+                          setSelectedClient({
+                            ...selectedClient,
+                            service_type:
+                              value as ServiceType,
+                          })
+                        }
+                      />
+
+                      {/* PMU */}
+                      {selectedClient.service_type ===
+                        "PMU" && (
+
+                        <AdminSelect
+                          label="PMU Service"
+                          value={
+                            selectedClient.pmu_service ||
+                            ""
+                          }
+                          options={[
+                            "Eyebrow PMU",
+                            "Microblading",
+                            "Lip Blush",
+                            "Eyeliner PMU",
+                            "Scalp Micropigmentation",
+                            "Other",
+                          ]}
+                          onChange={(
+                            value
+                          ) =>
+                            setSelectedClient({
+                              ...selectedClient,
+                              pmu_service:
+                                value,
+                            })
+                          }
+                        />
+                      )}
+
+                      <AdminInput
+                        label="ID Proof"
+                        value={
+                          selectedClient.idProof
+                        }
+                        onChange={(
+                          value
+                        ) =>
+                          setSelectedClient({
+                            ...selectedClient,
+                            idProof:
+                              value,
+                          })
+                        }
+                      />
+
+                      <AdminSelect
+                        label="Mode Of Payment"
+                        value={
+                          selectedClient.payment_mode ||
+                          ""
+                        }
+                        options={[
+                          "",
+                          "Cash",
+                          "GPay",
+                          "Card",
+                        ]}
+                        onChange={(
+                          value
+                        ) =>
+                          setSelectedClient({
+                            ...selectedClient,
+                            payment_mode:
+                              value,
+                          })
+                        }
+                      />
+
+                      <AdminInput
+                        label="Price"
+                        value={
+                          selectedClient.price ||
+                          ""
+                        }
+                        onChange={(
+                          value
+                        ) =>
+                          setSelectedClient({
+                            ...selectedClient,
+                            price:
+                              value.replace(
+                                /[^\d.]/g,
+                                ""
+                              ),
+                          })
+                        }
+                      />
+                    </div>
+
+                    {/* EDIT CLIENT PHOTO */}
+                    <div className="w-full max-w-[240px] lg:w-[240px] mx-auto lg:mx-0 flex-shrink-0 flex flex-col">
+                      <label className="mb-3 block text-sm uppercase tracking-[2px] text-[#D4AF37] font-semibold">
+                        Client Photo
+                      </label>
+                      <div className="relative aspect-[3/4] w-full rounded-[22px] border border-[#D4AF37]/10 bg-black/40 overflow-hidden flex flex-col items-center justify-center p-3">
+                        {selectedClient.client_photo ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={selectedClient.client_photo}
+                            alt="Client"
+                            className="absolute inset-0 w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div className="text-center p-4">
+                            <Users className="text-neutral-500 mx-auto mb-2" size={24} />
+                            <span className="text-xs text-neutral-500 uppercase tracking-wider font-bold">No Photo</span>
+                          </div>
+                        )}
+                      </div>
+                      
+                      <div className="mt-4 flex flex-col gap-2">
+                        <label className="w-full rounded-full border border-[#D4AF37]/20 bg-black/40 py-3 text-center text-xs font-semibold text-[#D4AF37] cursor-pointer hover:bg-[#D4AF37]/10 transition flex items-center justify-center gap-2">
+                          <Upload size={14} />
+                          <span>Change Photo</span>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) {
+                                const reader = new FileReader();
+                                reader.onloadend = () => {
+                                  setSelectedClient({
+                                    ...selectedClient,
+                                    client_photo: reader.result as string
+                                  });
+                                };
+                                reader.readAsDataURL(file);
+                              }
+                            }}
+                            className="hidden"
+                          />
+                        </label>
+                        {selectedClient.client_photo && (
+                          <button
+                            type="button"
+                            onClick={() => setSelectedClient({ ...selectedClient, client_photo: "" })}
+                            className="w-full py-2 text-xs font-semibold text-red-400 underline cursor-pointer"
+                          >
+                            Remove Photo
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* ADDRESS */}
+                  <div className="mt-5">
+
+                    <label className="mb-3 block text-sm uppercase tracking-[2px] text-[#D4AF37] font-semibold">
+
+                      Address
+
+                    </label>
+
+                    <textarea
+                      rows={4}
+                      value={
+                        selectedClient.address
+                      }
+                      onChange={(
+                        e
+                      ) =>
+                        setSelectedClient({
+                          ...selectedClient,
+                          address:
+                            e.target.value,
+                        })
+                      }
+                      className="w-full rounded-[22px] border border-[#D4AF37]/10 bg-black/40 p-5 resize-none outline-none"
+                    />
+
+                  </div>
+
+                </div>
+                {/* QUESTIONNAIRE */}
+                <div className="mt-8 rounded-[30px] border border-[#D4AF37]/10 bg-[#121212] p-8">
+
+                  <h3 className="mb-8 text-[28px] font-black uppercase">
+
+                    Questionnaire
+
+                  </h3>
+
+                  <div className="space-y-5">
+
+                    {selectedClient.questionnaire &&
+                      Object.entries(
+                        selectedClient.questionnaire
+                      ).map(
+                        ([
+                          question,
+                          answer,
+                        ]) => (
+
+                          <div
+                            key={
+                              question
+                            }
+                            className="rounded-[22px] border border-[#D4AF37]/10 bg-black/30 p-5"
+                          >
+
+                            <p className="font-medium text-neutral-300">
+
+                              {
+                                question
+                              }
+
+                            </p>
+
+                            <div className="mt-4 flex gap-3">
+
+                              {[
+                                "Yes",
+                                "No",
+                              ].map(
+                                (
+                                  option
+                                ) => (
+
+                                  <button
+                                    key={
+                                      option
+                                    }
+                                    type="button"
+                                    onClick={() =>
+                                      setSelectedClient({
+                                        ...selectedClient,
+                                        questionnaire:
+                                          {
+                                            ...selectedClient.questionnaire,
+                                            [question]:
+                                              option,
+                                          },
+                                      })
+                                    }
+                                    className={
+                                      answer ===
+                                      option
+                                        ? "rounded-full bg-[#D4AF37] px-6 py-3 text-black"
+                                        : "rounded-full border border-[#D4AF37]/10 bg-black px-6 py-3"
+                                    }
+                                  >
+                                    {
+                                      option
+                                    }
+                                  </button>
+                                )
+                              )}
+
+                            </div>
+
+                          </div>
+                        )
+                      )}
+
+                  </div>
+                </div>
+
+                {/* NOTES */}
+                <div className="mt-8 rounded-[30px] border border-[#D4AF37]/10 bg-[#121212] p-8">
+
+                  <h3 className="mb-5 text-[28px] font-black uppercase">
+
+                    Notes
+
+                  </h3>
+
+                  <textarea
+                    rows={5}
+                    value={
+                      selectedClient.notes ||
+                      ""
+                    }
+                    onChange={(
+                      e
+                    ) =>
+                      setSelectedClient({
+                        ...selectedClient,
+                        notes:
+                          e.target.value,
+                      })
+                    }
+                    className="w-full rounded-[22px] border border-[#D4AF37]/10 bg-black/40 p-5 resize-none outline-none"
+                  />
+
+                </div>
+
+                {/* SAVE */}
+                <div className="mt-8 flex justify-end gap-4">
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setEditing(
+                        false
+                      )
+                    }
+                    className="rounded-full border border-red-500/20 bg-red-500/10 px-8 py-4 font-semibold text-red-400"
+                  >
+                    Cancel
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={async () => {
+
+                      await fetch(
+                        "/api/consent",
+                        {
+                          method:
+                            "PUT",
+                          headers:
+                            {
+                              "Content-Type":
+                                "application/json",
+                            },
+                          body:
+                            JSON.stringify(
+                              selectedClient
+                            ),
+                        }
+                      );
+
+                      fetchClients();
+
+                      setEditing(
+                        false
+                      );
+                    }}
+                    className="flex items-center gap-2 rounded-full bg-[#D4AF37] px-8 py-4 font-black uppercase text-black"
+                  >
+                    <Save
+                      size={18}
+                    />
+
+                    Save Changes
+                  </button>
+
+                </div>
+
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* CONTENT EDITOR */}
+        {tab ===
+          "content" && (
+
+          <div>
+
+            <h2 className="text-[50px] font-black">
+
+              Consent Content Editor
+
+            </h2>
+
+            <div className="mt-8 flex flex-wrap gap-3">
+
+              {[
+                "Tattoo",
+                "PMU",
+                "Piercing",
+                "Tattoo Removal",
+              ].map(
+                (
+                  item
+                ) => (
+                  <button
+                    key={item}
+                    onClick={() =>
+                      setSelectedService(
+                        item
+                      )
+                    }
+                    className={
+                      selectedService ===
+                      item
+                        ? "rounded-full bg-[#D4AF37] px-6 py-3 text-black"
+                        : "rounded-full border border-[#D4AF37]/10 bg-[#111111] px-6 py-3"
+                    }
+                  >
+                    {item}
+                  </button>
+                )
+              )}
+
+            </div>
+
+            {/* ADD QUESTION */}
+            <div className="mt-8 rounded-[30px] border border-[#D4AF37]/10 bg-[#111111] p-8">
+
+              <h3 className="text-[26px] font-black uppercase">
+
+                Add Question
+
+              </h3>
+
+              <div className="mt-6 grid md:grid-cols-2 gap-5">
+
+                <input
+                  placeholder="English Question"
+                  value={
+                    newQuestion.question_en
+                  }
+                  onChange={(e) =>
+                    setNewQuestion({
+                      ...newQuestion,
+                      question_en:
+                        e.target.value,
+                    })
+                  }
+                  className="rounded-[22px] border border-[#D4AF37]/10 bg-black/40 p-5 outline-none"
+                />
+
+                <input
+                  placeholder="Tamil Question"
+                  value={
+                    newQuestion.question_ta
+                  }
+                  onChange={(e) =>
+                    setNewQuestion({
+                      ...newQuestion,
+                      question_ta:
+                        e.target.value,
+                    })
+                  }
+                  className="rounded-[22px] border border-[#D4AF37]/10 bg-black/40 p-5 outline-none"
+                />
+
+              </div>
+
+              <button
+                onClick={async () => {
+
+                  if (
+                    !newQuestion.question_en
+                  )
+                    return;
+
+                  await supabase
+                    .from(
+                      "consent_questions"
+                    )
+                    .insert([
+                      {
+                        service_type:
+                          selectedService,
+                        question_en:
+                          newQuestion.question_en,
+                        question_ta:
+                          newQuestion.question_ta,
+                      },
+                    ]);
+
+                  setNewQuestion({
+                    question_en:
+                      "",
+                    question_ta:
+                      "",
+                  });
+
+                  fetchQuestions();
+                }}
+                className="mt-6 flex items-center gap-2 rounded-full bg-[#D4AF37] px-8 py-4 font-black text-black"
+              >
+                <Plus
+                  size={18}
+                />
+
+                Add Question
+              </button>
+
+            </div>
+
+            <div className="mt-8 rounded-[30px] border border-[#D4AF37]/10 bg-[#111111] p-8">
+
+              <h3 className="text-[26px] font-black uppercase">
+                Questions
+              </h3>
+
+              <div className="mt-6 space-y-4">
+                {questions
+                  .filter(
+                    (question) =>
+                      question.service_type ===
+                      selectedService
+                  )
+                  .map((question) => (
+                    <div
+                      key={question.id}
+                      className="rounded-[22px] border border-[#D4AF37]/10 bg-black/30 p-5"
+                    >
+                      <p className="font-semibold text-white">
+                        {question.question_en}
+                      </p>
+
+                      <p className="mt-2 text-neutral-400">
+                        {question.question_ta}
+                      </p>
+                    </div>
+                  ))}
+
+                {questions.filter(
+                  (question) =>
+                    question.service_type ===
+                    selectedService
+                ).length === 0 && (
+                  <p className="text-neutral-500">
+                    No questions added for this service.
+                  </p>
+                )}
+              </div>
+            </div>
+
+          </div>
+        )}
+
+        {/* SETTINGS */}
+        {tab ===
+          "settings" && (
+
+          <div>
+            <h2 className="text-[50px] font-black">
+              Studio Settings
+            </h2>
+
+            <div className="mt-8 rounded-[30px] border border-[#D4AF37]/10 bg-[#111111] p-8">
+              <div className="grid md:grid-cols-2 gap-5">
+                <AdminInput
+                  label="Studio Name"
+                  value={studioSettings.studio_name}
+                  onChange={(value) =>
+                    setStudioSettings({
+                      ...studioSettings,
+                      studio_name: value,
+                    })
+                  }
+                />
+
+                <AdminInput
+                  label="Phone"
+                  value={studioSettings.phone}
+                  onChange={(value) =>
+                    setStudioSettings({
+                      ...studioSettings,
+                      phone: value,
+                    })
+                  }
+                />
+              </div>
+
+              <div className="mt-5">
+                <label className="mb-3 block text-sm uppercase tracking-[2px] text-[#D4AF37] font-semibold">
+                  Address
+                </label>
+
+                <textarea
+                  rows={4}
+                  value={studioSettings.address}
+                  onChange={(e) =>
+                    setStudioSettings({
+                      ...studioSettings,
+                      address:
+                        e.target.value,
+                    })
+                  }
+                  className="w-full rounded-[22px] border border-[#D4AF37]/10 bg-black/40 p-5 resize-none outline-none"
+                />
+              </div>
+            </div>
+          </div>
+        )}
+
+        <div
+          id="pdf-content"
+          className="hidden bg-white p-10 text-black"
+        >
+          {selectedClient && (
+            <div className="mx-auto w-full max-w-[720px] font-sans text-[13px] leading-6 text-black">
+              <div className="border-b-4 border-black pb-5 text-center">
+                <h1 className="text-2xl font-black uppercase tracking-wide">
+                  XTREME TATTOO STUDIO
+                </h1>
+
+                <p className="mt-1 text-sm">
+                  Consent Form
+                </p>
+
+                <p className="mt-2 text-xs">
+                  VIGNESH PLAZA, 12A, 1st Floor, Thillainagar Main Road, Trichy - 620018 | Contact: 7010343009
+                </p>
+              </div>
+
+              
+
+              <div className="mt-6 flex justify-between gap-6">
+                <div className="grid grid-cols-2 gap-4 flex-1">
+                  <PdfField
+                    label="Consent No"
+                    value={selectedClient.form_no}
+                  />
+
+                  <PdfField
+                    label="Date"
+                    value={
+                      selectedClient.consent_date
+                        ? new Date(
+                            selectedClient.consent_date
+                          ).toLocaleDateString()
+                        : selectedClient.created_at
+                        ? new Date(
+                            selectedClient.created_at
+                          ).toLocaleDateString()
+                        : new Date().toLocaleDateString()
+                    }
+                  />
+
+                  <PdfField
+                    label="Service"
+                    value={selectedClient.service_type}
+                  />
+
+                  <PdfField
+                    label="PMU Service"
+                    value={
+                      selectedClient.service_type ===
+                      "PMU"
+                        ? selectedClient.pmu_service
+                        : ""
+                    }
+                  />
+
+                  <PdfField
+                    label="Payment Mode"
+                    value={selectedClient.payment_mode}
+                  />
+
+                  <PdfField
+                    label="Price"
+                    value={
+                      selectedClient.price
+                        ? `₹${selectedClient.price}`
+                        : ""
+                    }
+                  />
+                </div>
+
+                <div className="w-[120px] h-[160px] border border-black flex items-center justify-center overflow-hidden flex-shrink-0 bg-neutral-50">
+                  {selectedClient.client_photo ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={selectedClient.client_photo}
+                      alt="Client Photo"
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <span className="text-[10px] text-neutral-400 font-bold uppercase text-center p-2">
+                      No Photo
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              <PdfSection title="Client Details">
+                <div className="grid grid-cols-2 gap-3">
+                  <PdfField
+                    label="Client Name"
+                    value={selectedClient.name}
+                  />
+
+                  <PdfField
+                    label="Phone Number"
+                    value={selectedClient.phone}
+                  />
+
+                  <PdfField
+                    label="Date Of Birth"
+                    value={selectedClient.dob}
+                  />
+
+                  <PdfField
+                    label="Age"
+                    value={selectedClient.age}
+                  />
+
+                  <PdfField
+                    label="Gender"
+                    value={selectedClient.gender}
+                  />
+
+                  <PdfField
+                    label="Occupation"
+                    value={selectedClient.occupation}
+                  />
+
+                  <PdfField
+                    label="ID Proof"
+                    value={selectedClient.idProof}
+                  />
+
+                  <PdfField
+                    label="Type Of Needle Used"
+                    value={selectedClient.needleType}
+                  />
+                </div>
+
+                <PdfField
+                  label="Address"
+                  value={selectedClient.address}
+                  full
+                />
+              </PdfSection>
+
+              <PdfSection title="Health Declaration">
+                <div className="space-y-3">
+                  {selectedClient.questionnaire &&
+                    Object.entries(
+                      selectedClient.questionnaire
+                    ).map(
+                      ([
+                        question,
+                        answer,
+                      ]) => (
+                        <div
+                          key={question}
+                          className="grid grid-cols-[1fr_90px] gap-3 border-b border-neutral-300 pb-2"
+                        >
+                          <p>
+                            {question}
+                          </p>
+
+                          <p className="font-bold">
+                            {answer}
+                          </p>
+                        </div>
+                      )
+                    )}
+
+                  {!selectedClient.questionnaire && (
+                    <p>
+                      No health declaration answers recorded.
+                    </p>
+                  )}
+                </div>
+
+                <PdfField
+                  label="If yes, specify"
+                  value={selectedClient.notes}
+                  full
+                />
+              </PdfSection>
+
+              <PdfSection title="Consent & Acknowledgment">
+                <ol className="list-decimal space-y-2 pl-5">
+                  <li>
+                    I voluntarily consent to receive the selected procedure at XTREME TATTOO STUDIO.
+                  </li>
+                  <li>
+                    I understand the procedure, results, healing, and risks may vary from person to person.
+                  </li>
+                  <li>
+                    I confirm that I have disclosed all medical conditions truthfully.
+                  </li>
+                  <li>
+                    I understand failure to follow aftercare instructions may affect healing and final results.
+                  </li>
+                  <li>
+                    I consent to studio photos for records and promotional purposes.
+                  </li>
+                  <li>
+                    I confirm I am not under the influence of alcohol or drugs during this procedure.
+                  </li>
+                  <li>
+                    I confirm I have read and understood this consent form fully.
+                  </li>
+                </ol>
+              </PdfSection>
+
+              <PdfSection title="Signatures">
+                <div className="grid grid-cols-2 gap-6">
+                  <div>
+                    <p className="mb-2 font-bold uppercase">
+                      Customer Signature
+                    </p>
+
+                    <div className="flex h-32 items-center justify-center border border-black">
+                      {selectedClient.customer_signature ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={selectedClient.customer_signature}
+                          alt="Customer signature"
+                          className="max-h-28 object-contain"
+                        />
+                      ) : (
+                        <span>
+                          Not signed
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div>
+                    <p className="mb-2 font-bold uppercase">
+                      Artist Signature
+                    </p>
+
+                    <div className="flex h-32 items-center justify-center border border-black">
+                      {selectedClient.artist_signature ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={selectedClient.artist_signature}
+                          alt="Artist signature"
+                          className="max-h-28 object-contain"
+                        />
+                      ) : (
+                        <span>
+                          Not signed
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </PdfSection>
+            </div>
+          )}
+        </div>
+
+      </section>
+    </main>
+  );
+}
+
+function SidebarButton({
+  label,
+  icon,
+  active,
+  onClick,
+}: {
+  label: string;
+  icon: React.ReactNode;
+  active: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`flex w-full items-center gap-3 rounded-[18px] px-5 py-4 text-left font-semibold transition ${
+        active
+          ? "bg-[#D4AF37] text-black"
+          : "text-neutral-300 hover:bg-[#141414]"
+      }`}
+    >
+      {icon}
+      {label}
+    </button>
+  );
+}
+
+function StatCard({
+  title,
+  value,
+}: {
+  title: string;
+  value: number | string;
+}) {
+  return (
+    <div className="rounded-[26px] border border-[#D4AF37]/10 bg-[#111111] p-6">
+      <p className="text-sm uppercase tracking-[2px] text-neutral-500">
+        {title}
+      </p>
+
+      <p className="mt-4 text-[40px] font-black text-[#D4AF37]">
+        {value}
+      </p>
+    </div>
+  );
+}
+
+function AdminInput({
+  label,
+  value,
+  onChange,
+  type = "text",
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  type?: string;
+}) {
+  return (
+    <div>
+      <label className="mb-3 block text-sm uppercase tracking-[2px] text-[#D4AF37] font-semibold">
+        {label}
+      </label>
+
+      <input
+        type={type}
+        value={value}
+        onChange={(e) =>
+          onChange(e.target.value)
+        }
+        className="w-full rounded-[22px] border border-[#2B6CB0]/10 bg-gray-100 p-5 outline-none"
+      />
+    </div>
+  );
+}
+
+function AdminSelect({
+  label,
+  value,
+  options,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  options: string[];
+  onChange: (value: string) => void;
+}) {
+  return (
+    <div>
+      <label className="mb-3 block text-sm uppercase tracking-[2px] text-[#D4AF37] font-semibold">
+        {label}
+      </label>
+
+      <select
+        value={value}
+        onChange={(e) =>
+          onChange(e.target.value)
+        }
+        className="w-full rounded-[22px] border border-[#2B6CB0]/10 bg-gray-100 p-5 outline-none"
+      >
+        {options.map((option) => (
+          <option
+            key={option}
+            value={option}
+          >
+            {option}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
+function downloadConsentPdf(
+  client: ClientData
+) {
+  const pdf = new jsPDF(
+    "p",
+    "mm",
+    "a4"
+  );
+
+  // Layout constants
+  const pageWidth = pdf.internal.pageSize.getWidth();
+  const pageHeight = pdf.internal.pageSize.getHeight();
+  const margin = 14;
+  const contentWidth = pageWidth - margin * 2;
+  const lineHeight = 6;
+  let y = 14;
+
+  const startPage = () => {
+    // Ensure a new page only if not the first page
+    if (pdf.getNumberOfPages() > 1) pdf.addPage();
+    // Reset y to top margin
+    y = margin;
+    // Use black text on white background
+    pdf.setTextColor(0, 0, 0);
+    pdf.setFontSize(12);
+  };
+// Replace consent page start with manual dark page setup
+const startConsentPage = () => {
+  pdf.addPage();
+  pdf.setFillColor(30, 30, 30);
+  pdf.rect(margin, margin, contentWidth, pageHeight - 2 * margin, "F");
+  pdf.setTextColor(255, 255, 255);
+  pdf.setFontSize(12);
+  y = margin;
+};
+
+  // Initialize first page
+  startPage();
+
+
+
+  const ensureSpace = (
+    height: number
+  ) => {
+    if (
+      y + height >
+      pageHeight - margin
+    ) {
+      pdf.addPage();
+      y = margin;
+    }
+  };
+
+  const text = (
+    value: string,
+    x: number,
+    fontSize = 10,
+    style: "normal" | "bold" =
+      "normal"
+  ) => {
+    pdf.setFont(
+      "helvetica",
+      style
+    );
+    pdf.setFontSize(
+      fontSize
+    );
+    pdf.text(
+      value,
+      x,
+      y
+    );
+  };
+
+  const section = (
+    title: string
+  ) => {
+    ensureSpace(14);
+    y += 4;
+// Section title styling without background fill (dark theme already applied)
+  // No additional fill needed here
+  // Title text will appear in light color due to global text color
+  y += 6;
+  text(
+    title,
+    margin + 3,
+    11,
+    "bold"
+  );
+  y += 8;
+  };
+
+  const field = (
+    label: string,
+    value?: string,
+    width = contentWidth
+  ) => {
+    const displayValue =
+      value || "--";
+    const lines =
+      pdf.splitTextToSize(
+        displayValue,
+        width
+      ) as string[];
+    const height =
+      9 + lines.length * lineHeight;
+
+    ensureSpace(height);
+pdf.setTextColor(68,68,68);
+    text(
+      label.toUpperCase(),
+      margin,
+      8,
+      "bold"
+    );
+pdf.setTextColor(0,0,0);
+    y += 5;
+    pdf.setFont(
+      "helvetica",
+      "normal"
+    );
+    pdf.setFontSize(10);
+    pdf.text(
+      lines,
+      margin,
+      y
+    );
+    y +=
+      lines.length * lineHeight +
+      3;
+  };
+
+  const questionRow = (
+    question: string,
+    answer: string
+  ) => {
+    const questionLines =
+      pdf.splitTextToSize(
+        question,
+        contentWidth - 28
+      ) as string[];
+    const height =
+      Math.max(
+        questionLines.length *
+          lineHeight,
+        lineHeight
+      ) + 4;
+
+    ensureSpace(height);
+    pdf.setFont(
+      "helvetica",
+      "normal"
+    );
+    pdf.setFontSize(10);
+    pdf.text(
+      questionLines,
+      margin,
+      y
+    );
+    pdf.setFont(
+      "helvetica",
+      "bold"
+    );
+    pdf.text(
+      answer || "--",
+      pageWidth - margin - 22,
+      y
+    );
+    y += height;
+  };
+
+  const addSignature = (
+    label: string,
+    signature: string | undefined,
+    x: number
+  ) => {
+    pdf.setFont(
+      "helvetica",
+      "bold"
+    );
+    pdf.setFontSize(9);
+    pdf.text(
+      label,
+      x,
+      y
+    );
+    pdf.rect(
+      x,
+      y + 4,
+      82,
+      32
+    );
+
+    if (signature) {
+      try {
+        const format =
+          signature.includes(
+            "image/jpeg"
+          )
+            ? "JPEG"
+            : "PNG";
+
+        pdf.addImage(
+          signature,
+          format,
+          x + 4,
+          y + 8,
+          74,
+          22
+        );
+      } catch {
+        pdf.setFont(
+          "helvetica",
+          "normal"
+        );
+        pdf.text(
+          "Signature image unavailable",
+          x + 6,
+          y + 22
+        );
+      }
+    } else {
+      pdf.setFont(
+        "helvetica",
+        "normal"
+      );
+      pdf.text(
+        "Not signed",
+        x + 28,
+        y + 22
+      );
+    }
+  };
+
+  pdf.setFont(
+    "helvetica",
+    "bold"
+  );
+  pdf.setFontSize(18);
+  pdf.text(
+    "XTREME TATTOO STUDIO",
+    pageWidth / 2,
+    y,
+    { align: "center" }
+  );
+  y += 8;
+
+  pdf.setFontSize(12);
+  pdf.text(
+    "Consent Form",
+    pageWidth / 2,
+    y,
+    { align: "center" }
+  );
+  y += 6;
+
+  pdf.setFont(
+    "helvetica",
+    "normal"
+  );
+  pdf.setFontSize(8);
+  pdf.text(
+    "VIGNESH PLAZA, 12A, 1st Floor, Thillainagar Main Road, Trichy - 620018 | Contact: 7010343009",
+    pageWidth / 2,
+    y,
+    { align: "center" }
+  );
+  y += 10;
+
+  
+
+  field(
+    "Consent No",
+    client.form_no,
+    120
+  );
+  field(
+    "Date",
+    client.consent_date
+      ? new Date(
+          client.consent_date
+        ).toLocaleDateString()
+      : client.created_at
+      ? new Date(
+          client.created_at
+        ).toLocaleDateString()
+      : new Date().toLocaleDateString(),
+    120
+  );
+  field(
+    "Service",
+    client.service_type,
+    120
+  );
+
+  field(
+    "Payment Mode",
+    client.payment_mode,
+    120
+  );
+
+  field(
+    "Price",
+    client.price
+      ? `Rs. ${client.price}`
+      : "",
+    120
+  );
+
+  if (
+    client.service_type === "PMU"
+  ) {
+    field(
+      "PMU Service",
+      client.pmu_service,
+      120
+    );
+  }
+
+  // Draw Client Photo on the right side
+  // Position: x = 151, y = 42, width = 45, height = 60
+  pdf.rect(151, 42, 45, 60);
+  if (client.client_photo) {
+    try {
+      const format = client.client_photo.includes("image/jpeg") ? "JPEG" : "PNG";
+      pdf.addImage(client.client_photo, format, 151, 42, 45, 60);
+    } catch (e) {
+      console.error("Could not add photo to PDF:", e);
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(8);
+      pdf.text("PHOTO ERROR", 154, 72);
+    }
+  } else {
+    pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(8);
+    pdf.text("CLIENT PHOTO", 159, 70);
+    pdf.setFont("helvetica", "normal");
+    pdf.text("(NO PHOTO)", 162, 75);
+  }
+
+  // Ensure y coordinate is past both the metadata fields and the photo
+  y = Math.max(y, 107);
+
+  section(
+    "Client Details"
+  );
+  field(
+    "Client Name",
+    client.name
+  );
+  field(
+    "Phone Number",
+    client.phone
+  );
+  field(
+    "Date Of Birth",
+    client.dob
+  );
+  field(
+    "Age",
+    client.age
+  );
+  field(
+    "Gender",
+    client.gender
+  );
+  field(
+    "Occupation",
+    client.occupation
+  );
+  field(
+    "Address",
+    client.address
+  );
+  field(
+    "ID Proof",
+    client.idProof
+  );
+
+  if (client.needleType) {
+    field(
+      "Type Of Needle Used",
+      client.needleType
+    );
+  }
+
+  pdf.addPage();
+  y = margin;
+  section(
+    "Health Declaration"
+  );
+
+  if (client.questionnaire) {
+    Object.entries(
+      client.questionnaire
+    ).forEach(
+      ([
+        question,
+        answer,
+      ]) =>
+        questionRow(
+          question,
+          answer
+        )
+    );
+  } else {
+    field(
+      "Answers",
+      "No health declaration answers recorded."
+    );
+  }
+
+  field(
+          "If yes, specify",
+    client.notes
+  );
+
+  // Start Consent & Acknowledgment page with dark background
+  startPage();
+  // White background (no dark fill)
+  pdf.setFillColor(255, 255, 255);
+  pdf.rect(margin, margin, contentWidth, pageHeight - 2 * margin, "F");
+  // Dark text on white background
+  pdf.setTextColor(0, 0, 0);
+  // Larger font for readability
+  pdf.setFontSize(12);
+  section("Consent & Acknowledgment");
+
+  [
+    "I voluntarily consent to receive the selected procedure at XTREME TATTOO STUDIO.",
+    "I understand the procedure, results, healing, and risks may vary from person to person.",
+    "I confirm that I have disclosed all medical conditions truthfully.",
+    "I understand failure to follow aftercare instructions may affect healing and final results.",
+    "I consent to studio photos for records and promotional purposes.",
+    "I confirm I am not under the influence of alcohol or drugs during this procedure.",
+    "I confirm I have read and understood this consent form fully.",
+  ].forEach(
+    (item, index) => {
+      const lines =
+        pdf.splitTextToSize(
+          `${index + 1}. ${item}`,
+          contentWidth
+        ) as string[];
+
+      ensureSpace(
+        lines.length * lineHeight +
+          2
+      );
+      pdf.setFont(
+        "helvetica",
+        "normal"
+      );
+      pdf.setFontSize(10);
+      pdf.text(
+        lines,
+        margin,
+        y
+      );
+      y +=
+        lines.length * lineHeight +
+        2;
+    }
+  );
+
+  section("Signatures");
+  ensureSpace(45);
+  addSignature(
+    "Customer Signature",
+    client.customer_signature,
+    margin
+  );
+  addSignature(
+    "Artist Signature",
+    client.artist_signature,
+    pageWidth / 2 + 5
+  );
+  y += 42;
+
+  const fileName =
+    `${client.name || "client"}-consent.pdf`.replace(
+      /[\\/:*?"<>|]+/g,
+      "-"
+    );
+
+  pdf.save(fileName);
+}
+
+function PdfSection({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="mt-6 break-inside-avoid border border-black p-4">
+      <h2 className="mb-4 border-b border-black pb-2 text-base font-black uppercase">
+        {title}
+      </h2>
+
+      {children}
+    </section>
+  );
+}
+
+function PdfField({
+  label,
+  value,
+  full = false,
+}: {
+  label: string;
+  value?: string;
+  full?: boolean;
+}) {
+  return (
+    <div
+      className={
+        full
+          ? "mt-3"
+          : ""
+      }
+    >
+      <p className="text-[10px] font-bold uppercase tracking-wide text-neutral-600">
+        {label}
+      </p>
+
+      <p className="min-h-7 border-b border-neutral-400 pb-1 font-semibold">
+        {value || "--"}
+      </p>
+    </div>
+  );
+}
