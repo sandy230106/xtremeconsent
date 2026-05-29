@@ -241,29 +241,30 @@ export default function Home() {
           const data =
             await res.json();
 
-          const next =
-            (data?.length || 0) +
-            1;
+          const serviceForms = Array.isArray(data)
+            ? data.filter((item: any) => item.service_type === service)
+            : [];
+
+          let next = 1;
+          if (serviceForms.length > 0) {
+            const numbers = serviceForms.map((item: any) => {
+              const match = item.form_no?.match(/-(\d+)$/);
+              return match ? parseInt(match[1], 10) : 0;
+            });
+            next = Math.max(...numbers) + 1;
+          }
 
           const prefix =
-            service ===
-            "Tattoo"
+            service === "Tattoo"
               ? "TAT"
-              : service ===
-                "PMU"
+              : service === "PMU"
               ? "PMU"
-              : service ===
-                "Piercing"
+              : service === "Piercing"
               ? "PRC"
               : "REM";
 
           setFormNo(
-            `XT-${prefix}-${String(
-              next
-            ).padStart(
-              3,
-              "0"
-            )}`
+            `XT-${prefix}-${String(next).padStart(3, "0")}`
           );
         } catch {
           setFormNo(
