@@ -805,9 +805,9 @@ export default function AdminPage() {
 
                         {/* PDF */}
                         <button
-                          onClick={() => {
+                          onClick={async () => {
                             try {
-                              downloadConsentPdf(
+                              await downloadConsentPdf(
                                 client
                               );
                             } catch (error) {
@@ -2038,7 +2038,17 @@ function AdminSelect({
   );
 }
 
-function downloadConsentPdf(
+const loadImage = (src: string): Promise<HTMLImageElement> => {
+  return new Promise((resolve, reject) => {
+    const img = new window.Image();
+    img.src = src;
+    img.crossOrigin = "anonymous";
+    img.onload = () => resolve(img);
+    img.onerror = (e) => reject(e);
+  });
+};
+
+async function downloadConsentPdf(
   client: ClientData
 ) {
   const pdf = new jsPDF(
@@ -2054,6 +2064,14 @@ function downloadConsentPdf(
   const contentWidth = pageWidth - margin * 2;
   const lineHeight = 6;
   let y = 14;
+
+  // Preload logo
+  let logoImg: HTMLImageElement | null = null;
+  try {
+    logoImg = await loadImage("/logo.jpg");
+  } catch (e) {
+    console.error("Failed to load logo image:", e);
+  }
 
   const startPage = () => {
     // Ensure a new page only if not the first page
@@ -2115,19 +2133,21 @@ const startConsentPage = () => {
   const section = (
     title: string
   ) => {
-    ensureSpace(14);
-    y += 4;
-// Section title styling without background fill (dark theme already applied)
-  // No additional fill needed here
-  // Title text will appear in light color due to global text color
-  y += 6;
-  text(
-    title,
-    margin + 3,
-    11,
-    "bold"
-  );
-  y += 8;
+    ensureSpace(18);
+    y += 2;
+    // Beautiful solid charcoal header bar with gold accent
+    pdf.setFillColor(26, 26, 26);
+    pdf.rect(margin, y, contentWidth, 8, "F");
+    
+    // Centered text inside the 8mm tall bar
+    pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(10);
+    pdf.setTextColor(212, 175, 55); // Premium Gold
+    pdf.text(title.toUpperCase(), margin + 3, y + 5.5);
+    
+    // Reset text color to black for normal content
+    pdf.setTextColor(0, 0, 0);
+    y += 12;
   };
 
   const field = (
@@ -2146,14 +2166,16 @@ const startConsentPage = () => {
       9 + lines.length * lineHeight;
 
     ensureSpace(height);
-pdf.setTextColor(68,68,68);
+    // Dark charcoal for label - highly professional
+    pdf.setTextColor(50, 50, 50);
     text(
       label.toUpperCase(),
       margin,
-      8,
+      9,
       "bold"
     );
-pdf.setTextColor(0,0,0);
+    // Clean black for value
+    pdf.setTextColor(0, 0, 0);
     y += 5;
     pdf.setFont(
       "helvetica",
@@ -2184,28 +2206,32 @@ pdf.setTextColor(0,0,0);
         questionLines.length *
           lineHeight,
         lineHeight
-      ) + 4;
+      ) + 6;
 
     ensureSpace(height);
-    pdf.setFont(
-      "helvetica",
-      "normal"
-    );
+    // Question in dark charcoal
+    pdf.setFont("helvetica", "normal");
     pdf.setFontSize(10);
+    pdf.setTextColor(30, 30, 30);
     pdf.text(
       questionLines,
       margin,
       y
     );
-    pdf.setFont(
-      "helvetica",
-      "bold"
-    );
+    // Answer in bold black
+    pdf.setFont("helvetica", "bold");
+    pdf.setTextColor(0, 0, 0);
     pdf.text(
       answer || "--",
       pageWidth - margin - 22,
       y
     );
+
+    // Subtle line divider
+    pdf.setDrawColor(230, 230, 230);
+    pdf.setLineWidth(0.15);
+    pdf.line(margin, y + height - 3, pageWidth - margin, y + height - 3);
+
     y += height;
   };
 
@@ -2272,32 +2298,26 @@ pdf.setTextColor(0,0,0);
     }
   };
 
-  pdf.setFont(
-    "helvetica",
-    "bold"
-  );
-  pdf.setFontSize(18);
-  pdf.text(
-    "XTREME TATTOO STUDIO",
-    pageWidth / 2,
-    y,
-    { align: "center" }
-  );
-  y += 8;
+  if (logoImg) {
+    // Draw the gorgeous logo centered
+    const logoWidth = 60;
+    const logoHeight = 42;
+    pdf.addImage(logoImg, "JPEG", (pageWidth - logoWidth) / 2, y, logoWidth, logoHeight);
+    y += logoHeight + 4;
+  } else {
+    // Fallback text if logo doesn't load
+    pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(18);
+    pdf.text("XTREME TATTOO STUDIO", pageWidth / 2, y, { align: "center" });
+    y += 8;
+  }
 
+  pdf.setFont("helvetica", "bold");
   pdf.setFontSize(12);
-  pdf.text(
-    "Consent Form",
-    pageWidth / 2,
-    y,
-    { align: "center" }
-  );
+  pdf.text("Consent Form", pageWidth / 2, y, { align: "center" });
   y += 6;
 
-  pdf.setFont(
-    "helvetica",
-    "normal"
-  );
+  pdf.setFont("helvetica", "normal");
   pdf.setFontSize(8);
   pdf.text(
     "VIGNESH PLAZA, 12A, 1st Floor, Thillainagar Main Road, Trichy - 620018 | Contact: 7010343009",
