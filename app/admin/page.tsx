@@ -2298,37 +2298,76 @@ const startConsentPage = () => {
     }
   };
 
+  // Draw the nice outer border box around the header
+  pdf.setDrawColor(26, 26, 26);
+  pdf.setLineWidth(0.3);
+  pdf.rect(margin, y, contentWidth, 28);
+
   if (logoImg) {
-    // Draw the gorgeous logo centered
-    const logoWidth = 60;
-    const logoHeight = 42;
-    pdf.addImage(logoImg, "JPEG", (pageWidth - logoWidth) / 2, y, logoWidth, logoHeight);
-    y += logoHeight + 4;
+    // Draw logo on the left side of the header
+    const logoWidth = 32;
+    const logoHeight = 22;
+    pdf.addImage(logoImg, "JPEG", margin + 4, y + 3, logoWidth, logoHeight);
   } else {
-    // Fallback text if logo doesn't load
+    // Fallback if logo fails
     pdf.setFont("helvetica", "bold");
-    pdf.setFontSize(18);
-    pdf.text("XTREME TATTOO STUDIO", pageWidth / 2, y, { align: "center" });
-    y += 8;
+    pdf.setFontSize(14);
+    pdf.text("LOGO", margin + 12, y + 15);
   }
 
+  // Draw studio name and address inside the header box on the right of the logo
   pdf.setFont("helvetica", "bold");
-  pdf.setFontSize(12);
-  pdf.text("Consent Form", pageWidth / 2, y, { align: "center" });
-  y += 6;
+  pdf.setFontSize(16);
+  pdf.setTextColor(212, 175, 55); // Premium Brand Gold
+  pdf.text("XTREME TATTOO STUDIO", margin + 42, y + 10);
 
   pdf.setFont("helvetica", "normal");
-  pdf.setFontSize(8);
-  pdf.text(
-    "VIGNESH PLAZA, 12A, 1st Floor, Thillainagar Main Road, Trichy - 620018 | Contact: 7010343009",
-    pageWidth / 2,
-    y,
-    { align: "center" }
-  );
-  y += 10;
+  pdf.setFontSize(8.5);
+  pdf.setTextColor(80, 80, 80); // Dark Charcoal for legible address
+  pdf.text("VIGNESH PLAZA, 12A, 1st Floor, Thillainagar Main Road,", margin + 42, y + 17);
+  pdf.text("Trichy - 620018 | Contact: 7010343009", margin + 42, y + 22);
 
-  
+  // Set y past the header box
+  y += 28 + 6;
 
+  // Draw the highlighted Consent Form banner centered
+  pdf.setFillColor(26, 26, 26); // Dark Charcoal
+  pdf.rect((pageWidth - 70) / 2, y - 4, 70, 7, "F"); // Background bar for title
+
+  pdf.setFont("helvetica", "bold");
+  pdf.setFontSize(11.5);
+  pdf.setTextColor(212, 175, 55); // Premium Gold
+  pdf.text("CONSENT FORM", pageWidth / 2, y + 1, { align: "center" });
+
+  // Reset text color to black for normal elements
+  pdf.setTextColor(0, 0, 0);
+  y += 7;
+
+  // Let's set the baseline for metadata fields and photo side-by-side
+  const metadataStart = y;
+
+  // Draw Client Photo on the right side
+  // Position: x = 151, y = metadataStart, width = 45, height = 55
+  pdf.rect(151, metadataStart, 45, 55);
+  if (client.client_photo) {
+    try {
+      const format = client.client_photo.includes("image/jpeg") ? "JPEG" : "PNG";
+      pdf.addImage(client.client_photo, format, 151, metadataStart, 45, 55);
+    } catch (e) {
+      console.error("Could not add photo to PDF:", e);
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(8);
+      pdf.text("PHOTO ERROR", 154, metadataStart + 28);
+    }
+  } else {
+    pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(8);
+    pdf.text("CLIENT PHOTO", 159, metadataStart + 26);
+    pdf.setFont("helvetica", "normal");
+    pdf.text("(NO PHOTO)", 162, metadataStart + 31);
+  }
+
+  // Draw metadata fields on the left side
   field(
     "Consent No",
     client.form_no,
@@ -2352,13 +2391,11 @@ const startConsentPage = () => {
     client.service_type,
     120
   );
-
   field(
     "Payment Mode",
     client.payment_mode,
     120
   );
-
   field(
     "Price",
     client.price
@@ -2367,9 +2404,7 @@ const startConsentPage = () => {
     120
   );
 
-  if (
-    client.service_type === "PMU"
-  ) {
+  if (client.service_type === "PMU") {
     field(
       "PMU Service",
       client.pmu_service,
@@ -2377,29 +2412,8 @@ const startConsentPage = () => {
     );
   }
 
-  // Draw Client Photo on the right side
-  // Position: x = 151, y = 42, width = 45, height = 60
-  pdf.rect(151, 42, 45, 60);
-  if (client.client_photo) {
-    try {
-      const format = client.client_photo.includes("image/jpeg") ? "JPEG" : "PNG";
-      pdf.addImage(client.client_photo, format, 151, 42, 45, 60);
-    } catch (e) {
-      console.error("Could not add photo to PDF:", e);
-      pdf.setFont("helvetica", "bold");
-      pdf.setFontSize(8);
-      pdf.text("PHOTO ERROR", 154, 72);
-    }
-  } else {
-    pdf.setFont("helvetica", "bold");
-    pdf.setFontSize(8);
-    pdf.text("CLIENT PHOTO", 159, 70);
-    pdf.setFont("helvetica", "normal");
-    pdf.text("(NO PHOTO)", 162, 75);
-  }
-
-  // Ensure y coordinate is past both the metadata fields and the photo
-  y = Math.max(y, 107);
+  // Ensure y coordinate is past both the metadata fields and the client photo
+  y = Math.max(y, metadataStart + 55 + 4);
 
   section(
     "Client Details"
