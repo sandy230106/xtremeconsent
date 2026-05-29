@@ -1,150 +1,101 @@
-# Deployment Guide - Vercel + Supabase
+# Deployment Guide - Vercel + AWS DynamoDB
+
+This guide outlines how to deploy your dynamic Tattoo Consent Form application using AWS DynamoDB for cloud storage and Vercel for web hosting.
 
 ## Prerequisites
-- Supabase account (create at https://supabase.com)
-- Vercel account (create at https://vercel.com)
-- GitHub account with your repo pushed
+- AWS Account (create at https://aws.amazon.com)
+- Vercel Account (create at https://vercel.com)
+- GitHub Account with your repository pushed
 
-## Step 1: Set Up Supabase Database
+---
 
-### Create Supabase Project
-1. Go to https://supabase.com
-2. Create a new project
-3. Note down your **Project URL** and **Anon Key** from Settings > API
+## Step 1: Set Up AWS DynamoDB
 
-### Create consent_forms Table
-Run this SQL in your Supabase SQL Editor:
+### Create DynamoDB Tables
+You will need to create two tables in the AWS DynamoDB Console (under your preferred region, e.g., `us-east-1`):
 
-```sql
-CREATE TABLE consent_forms (
-  id BIGINT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
-  form_no TEXT,
-  consent_date TEXT,
-  service_type TEXT,
-  pmu_service TEXT,
-  name TEXT,
-  dob TEXT,
-  age TEXT,
-  gender TEXT,
-  occupation TEXT,
-  phone TEXT,
-  address TEXT,
-  idProof TEXT,
-  needleType TEXT,
-  payment_mode TEXT,
-  price TEXT,
-  questionnaire JSONB,
-  notes TEXT,
-  customer_signature TEXT,
-  artist_signature TEXT,
-  client_photo TEXT,
-  created_at TIMESTAMP DEFAULT NOW(),
-  updated_at TIMESTAMP DEFAULT NOW()
-);
+1. **`consent_forms` Table**
+   - **Table Name:** `consent_forms`
+   - **Partition Key:** `id` (Type: **String**)
+   - **Sort Key:** None
+   - Leave other settings as default (or choose **On-Demand** capacity to stay cost-efficient).
 
--- Create consent_questions table
-CREATE TABLE consent_questions (
-  id BIGINT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
-  service_type TEXT NOT NULL,
-  question_en TEXT NOT NULL,
-  question_ta TEXT,
-  created_at TIMESTAMP DEFAULT NOW()
-);
+2. **`consent_questions` Table**
+   - **Table Name:** `consent_questions`
+   - **Partition Key:** `id` (Type: **String**)
+   - **Sort Key:** None
+   - Leave other settings as default (or choose **On-Demand** capacity).
 
--- Create indexes for faster queries
-CREATE INDEX idx_form_no ON consent_forms(form_no);
-CREATE INDEX idx_created_at ON consent_forms(created_at DESC);
-CREATE INDEX idx_questions_service ON consent_questions(service_type);
+---
 
--- Enable RLS (Row Level Security)
-ALTER TABLE consent_forms ENABLE ROW LEVEL SECURITY;
-ALTER TABLE consent_questions ENABLE ROW LEVEL SECURITY;
+## Step 2: Set Up AWS Credentials & Permissions
 
--- Create policies to allow all inserts and reads
-CREATE POLICY "Allow all operations" ON consent_forms
-  FOR ALL USING (true) WITH CHECK (true);
+To allow Vercel to securely connect to your DynamoDB tables, you need to create an IAM User in AWS with permission to read and write to DynamoDB.
 
-CREATE POLICY "Allow all operations" ON consent_questions
-  FOR ALL USING (true) WITH CHECK (true);
+### Create IAM User and Access Keys
+1. Go to the **IAM Console** in AWS.
+2. Click **Users** > **Create User**.
+3. Set the username (e.g., `xtreme-consent-app`) and proceed.
+4. Set permissions by attaching policies directly:
+   - Search for and select **`AmazonDynamoDBFullAccess`** (or create a custom IAM policy targeting only the `consent_forms` and `consent_questions` tables for stricter security).
+5. Complete user creation.
+6. Click on the created user name, navigate to the **Security credentials** tab.
+7. Click **Create access key** under **Access keys**.
+8. Select **Command Line Interface (CLI)** or **Application running outside AWS** and proceed.
+9. **Save the Access Key ID and Secret Access Key securely!** (Keep these secret).
 
+---
+
+## Step 3: Local Testing and Environment Setup
+
+### 1. Set up `.env.local`
+Create a file named `.env.local` in your root project directory (this is already ignored in `.gitignore`) and fill in your AWS credentials:
+
+```env
+AWS_REGION=us-east-1
+AWS_ACCESS_KEY_ID=YOUR_AWS_ACCESS_KEY_ID
+AWS_SECRET_ACCESS_KEY=YOUR_AWS_SECRET_ACCESS_KEY
+DYNAMODB_TABLE_CONSENT_FORMS=consent_forms
+DYNAMODB_TABLE_CONSENT_QUESTIONS=consent_questions
 ```
 
-### Get Service Role Key
-1. Go to Supabase Dashboard > Settings > API
-2. Copy the **Service Role Secret** (keep this secret!)
-
-## Step 2: Deploy to Vercel
-
-### Option A: Using Vercel Dashboard
-1. Go to https://vercel.com
-2. Click "New Project"
-3. Import your GitHub repo
-4. Add Environment Variables:
-   - `NEXT_PUBLIC_SUPABASE_URL` = Your Supabase Project URL
-   - `NEXT_PUBLIC_SUPABASE_ANON_KEY` = Your Supabase Anon Key
-   - `SUPABASE_SERVICE_ROLE_KEY` = Your Service Role Secret
-5. Click "Deploy"
-
-### Option B: Using Vercel CLI
-```bash
-npm install -g vercel
-vercel
-# Follow the prompts and add environment variables
-```
-
-## Step 3: Local Testing
-
-### Set up .env.local
-Copy `.env.example` to `.env.local` and fill in your Supabase credentials:
-```
-NEXT_PUBLIC_SUPABASE_URL=https://xxxxx.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJxxxxx...
-SUPABASE_SERVICE_ROLE_KEY=eyJxxxxx...
-```
-
-### Run Locally
+### 2. Run Locally
 ```bash
 npm install
 npm run dev
 ```
+Open http://localhost:3000 to verify the application.
 
-Test the form at http://localhost:3000
+---
 
-## Step 4: Verify Everything Works
+## Step 4: Deploy to Vercel
 
-1. Fill out a consent form
-2. Submit it
-3. Go to Supabase Dashboard > Table Editor
-4. Check `consent_forms` table - your data should appear!
-5. In Vercel, click "Visit" to test the deployed site
+### Option A: Using Vercel Dashboard (Recommended)
+1. Go to [Vercel](https://vercel.com).
+2. Click **New Project** and import your GitHub repository (`xtremeconsent`).
+3. Under **Configure Project**, expand the **Environment Variables** section.
+4. Add the following **5 environment variables**:
+   - `AWS_REGION` = `us-east-1` (or your chosen AWS region)
+   - `AWS_ACCESS_KEY_ID` = `YOUR_AWS_ACCESS_KEY_ID`
+   - `AWS_SECRET_ACCESS_KEY` = `YOUR_AWS_SECRET_ACCESS_KEY`
+   - `DYNAMODB_TABLE_CONSENT_FORMS` = `consent_forms`
+   - `DYNAMODB_TABLE_CONSENT_QUESTIONS` = `consent_questions`
+5. Click **Deploy**! Vercel will automatically compile, build, and publish your website.
 
-## Security Notes
+### Option B: Using Vercel CLI
+If you prefer deploying from your terminal:
+```bash
+npm install -g vercel
+vercel
+# Link and add the environment variables in your Vercel Dashboard, then redeploy:
+vercel --prod
+```
 
-⚠️ **Important:**
-- Never commit `.env.local` to git (already in `.gitignore`)
-- Keep `SUPABASE_SERVICE_ROLE_KEY` secret - only use on server-side
-- In production, consider adding Row Level Security (RLS) policies
+---
 
-## Troubleshooting
+## Step 5: Verify Operations
 
-### Data not saving?
-- Check Vercel logs for API errors
-- Verify environment variables are set correctly in Vercel
-- Check Supabase table exists and has correct schema
-
-### Getting "Table not found" error?
-- Make sure you created the `consent_forms` table in Supabase
-- Check table name spelling
-
-### Getting 401 errors?
-- Verify API keys are correct
-- Make sure you're using Service Role Key (not Anon Key) in API route
-
-## Admin Dashboard
-
-The admin page at `/admin` automatically loads submitted consent forms from the database.
-You can:
-- View all submissions
-- Preview PDF
-- Download consent forms
-- Search and filter forms
+1. Fill out a consent form on the live site, draw the signatures, capture a camera photo, and click **Submit**.
+2. Log into the **AWS DynamoDB Console**, click on the **`consent_forms`** table, and click **Explore table items**. You will see the complete form JSON, signature strings, and photo saved in the cloud.
+3. Access the Admin Panel at `/admin` (e.g., `https://your-site.vercel.app/admin`). You will see all submissions loaded.
+4. Open **Questions** tab in the admin dashboard. Add a question, and verify it updates in the DynamoDB `consent_questions` table!

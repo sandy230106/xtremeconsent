@@ -1,35 +1,27 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { ddbDocClient } from "../../../lib/dynamodb";
+import { ScanCommand, PutCommand, DeleteCommand, GetCommand } from "@aws-sdk/lib-dynamodb";
 
 export const dynamic = "force-dynamic";
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://temp-placeholder.supabase.co";
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "temp-placeholder-key";
-
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
-
-type ConsentFormData = Record<string, unknown> & {
-  id?: number;
-};
-
 export async function GET() {
   try {
-    const { data, error } = await supabase
-      .from("consent_forms")
-      .select("*")
-      .order("created_at", { ascending: false });
+    const tableName = process.env.DYNAMODB_TABLE_CONSENT_FORMS || "consent_forms";
+    const data = await ddbDocClient.send(new ScanCommand({ TableName: tableName }));
+    
+    // Sort items by created_at descending in-memory
+    const items = data.Items || [];
+    items.sort((a, b) => {
+      const dateA = new Date(a.created_at || 0).getTime();
+      const dateB = new Date(b.created_at || 0).getTime();
+      return dateB - dateA;
+    });
 
-    if (error) {
-      return NextResponse.json(
-        { message: error.message },
-        { status: 400 }
-      );
-    }
-
-    return NextResponse.json(data || []);
-  } catch (err) {
+    return NextResponse.json(items);
+  } catch (err: any) {
+    console.error("Failed to fetch consent forms from DynamoDB:", err);
     return NextResponse.json(
-      { message: "Failed to fetch consent forms" },
+      { message: err.message || "Failed to fetch consent forms" },
       { status: 500 }
     );
   }
@@ -46,23 +38,32 @@ export async function POST(request: Request) {
       );
     }
 
-    const { data, error } = await supabase
-      .from("consent_forms")
-      .insert([body])
-      .select()
-      .single();
+    const tableName = process.env.DYNAMODB_TABLE_CONSENT_FORMS || "consent_forms";
+    
+    // Generate a unique ID if it's missing
+    const id = body.id || crypto.randomUUID();
+    const createdAt = body.created_at || new Date().toISOString();
+    const updatedAt = new Date().toISOString();
 
-    if (error) {
-      return NextResponse.json(
-        { message: error.message },
-        { status: 400 }
-      );
-    }
+    const newItem = {
+      ...body,
+      id: String(id), // ensure string representation in DynamoDB
+      created_at: createdAt,
+      updated_at: updatedAt,
+    };
 
-    return NextResponse.json(data, { status: 201 });
-  } catch (err) {
+    await ddbDocClient.send(
+      new PutCommand({
+        TableName: tableName,
+        Item: newItem,
+      })
+    );
+
+    return NextResponse.json(newItem, { status: 201 });
+  } catch (err: any) {
+    console.error("Failed to create consent form in DynamoDB:", err);
     return NextResponse.json(
-      { message: "Failed to create consent form" },
+      { message: err.message || "Failed to create consent form" },
       { status: 500 }
     );
   }
@@ -72,44 +73,50 @@ export async function PUT(request: Request) {
   try {
     const body = await request.json().catch(() => null);
 
-    if (
-      !body ||
-      typeof body !== "object" ||
-      typeof (body as ConsentFormData).id !== "number"
-    ) {
+    if (!body || typeof body !== "object" || !body.id) {
       return NextResponse.json(
-        { message: "Invalid request body" },
+        { message: "Invalid request body or missing ID" },
         { status: 400 }
       );
     }
 
-    const { id, ...updateData } = body as ConsentFormData & { id: number };
+    const tableName = process.env.DYNAMODB_TABLE_CONSENT_FORMS || "consent_forms";
+    const id = String(body.id);
 
-    const { data, error } = await supabase
-      .from("consent_forms")
-      .update(updateData)
-      .eq("id", id)
-      .select()
-      .single();
+    // Fetch the current item to merge existing values securely
+    const current = await ddbDocClient.send(
+      new GetCommand({
+        TableName: tableName,
+        Key: { id },
+      })
+    );
 
-    if (error) {
-      return NextResponse.json(
-        { message: error.message },
-        { status: 400 }
-      );
-    }
-
-    if (!data) {
+    if (!current.Item) {
       return NextResponse.json(
         { message: "Consent form not found" },
         { status: 404 }
       );
     }
 
-    return NextResponse.json(data);
-  } catch (err) {
+    const updatedItem = {
+      ...current.Item,
+      ...body,
+      id, // preserve ID
+      updated_at: new Date().toISOString(),
+    };
+
+    await ddbDocClient.send(
+      new PutCommand({
+        TableName: tableName,
+        Item: updatedItem,
+      })
+    );
+
+    return NextResponse.json(updatedItem);
+  } catch (err: any) {
+    console.error("Failed to update consent form in DynamoDB:", err);
     return NextResponse.json(
-      { message: "Failed to update consent form" },
+      { message: err.message || "Failed to update consent form" },
       { status: 500 }
     );
   }
@@ -117,31 +124,29 @@ export async function PUT(request: Request) {
 
 export async function DELETE(request: Request) {
   try {
-    const id = Number(new URL(request.url).searchParams.get("id"));
+    const id = new URL(request.url).searchParams.get("id");
 
-    if (!Number.isFinite(id)) {
+    if (!id) {
       return NextResponse.json(
-        { message: "Invalid consent form id" },
+        { message: "Invalid consent form ID" },
         { status: 400 }
       );
     }
 
-    const { error } = await supabase
-      .from("consent_forms")
-      .delete()
-      .eq("id", id);
+    const tableName = process.env.DYNAMODB_TABLE_CONSENT_FORMS || "consent_forms";
 
-    if (error) {
-      return NextResponse.json(
-        { message: error.message },
-        { status: 400 }
-      );
-    }
+    await ddbDocClient.send(
+      new DeleteCommand({
+        TableName: tableName,
+        Key: { id: String(id) },
+      })
+    );
 
     return NextResponse.json({ ok: true });
-  } catch (err) {
+  } catch (err: any) {
+    console.error("Failed to delete consent form in DynamoDB:", err);
     return NextResponse.json(
-      { message: "Failed to delete consent form" },
+      { message: err.message || "Failed to delete consent form" },
       { status: 500 }
     );
   }

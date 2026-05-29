@@ -24,8 +24,6 @@ import {
 
 import jsPDF from "jspdf";
 
-import { supabase } from "../../lib/supabase";
-
 /* =========================
    TYPES
 ========================= */
@@ -224,31 +222,13 @@ export default function AdminPage() {
 
   const fetchQuestions =
     async () => {
-
-      const {
-        data,
-        error,
-      } =
-        await supabase
-          .from(
-            "consent_questions"
-          )
-          .select("*");
-
-      if (
-        error
-      ) {
-
-        console.error(
-          error
-        );
-
-        return;
+      try {
+        const response = await fetch("/api/questions");
+        const data = await response.json();
+        setQuestions(data || []);
+      } catch (error) {
+        console.error("Failed to fetch questions:", error);
       }
-
-      setQuestions(
-        data || []
-      );
     };
 
   useEffect(() => {
@@ -1555,20 +1535,17 @@ export default function AdminPage() {
                   )
                     return;
 
-                  await supabase
-                    .from(
-                      "consent_questions"
-                    )
-                    .insert([
-                      {
-                        service_type:
-                          selectedService,
-                        question_en:
-                          newQuestion.question_en,
-                        question_ta:
-                          newQuestion.question_ta,
-                      },
-                    ]);
+                  await fetch("/api/questions", {
+                    method: "POST",
+                    headers: {
+                      "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({
+                      service_type: selectedService,
+                      question_en: newQuestion.question_en,
+                      question_ta: newQuestion.question_ta,
+                    }),
+                  });
 
                   setNewQuestion({
                     question_en:
