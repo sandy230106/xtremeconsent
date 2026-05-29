@@ -37,20 +37,36 @@ CREATE TABLE consent_forms (
   notes TEXT,
   customer_signature TEXT,
   artist_signature TEXT,
+  client_photo TEXT,
   created_at TIMESTAMP DEFAULT NOW(),
   updated_at TIMESTAMP DEFAULT NOW()
 );
 
--- Create index for faster queries
+-- Create consent_questions table
+CREATE TABLE consent_questions (
+  id BIGINT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
+  service_type TEXT NOT NULL,
+  question_en TEXT NOT NULL,
+  question_ta TEXT,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- Create indexes for faster queries
 CREATE INDEX idx_form_no ON consent_forms(form_no);
 CREATE INDEX idx_created_at ON consent_forms(created_at DESC);
+CREATE INDEX idx_questions_service ON consent_questions(service_type);
 
 -- Enable RLS (Row Level Security)
 ALTER TABLE consent_forms ENABLE ROW LEVEL SECURITY;
+ALTER TABLE consent_questions ENABLE ROW LEVEL SECURITY;
 
--- Create policy to allow all inserts and reads (adjust security as needed)
+-- Create policies to allow all inserts and reads
 CREATE POLICY "Allow all operations" ON consent_forms
   FOR ALL USING (true) WITH CHECK (true);
+
+CREATE POLICY "Allow all operations" ON consent_questions
+  FOR ALL USING (true) WITH CHECK (true);
+
 ```
 
 ### Get Service Role Key
