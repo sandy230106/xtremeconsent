@@ -1312,102 +1312,109 @@ export default function AdminPage() {
                           }
                         />
                       )}
-                    </div>
-
-                    {/* EDIT CLIENT PHOTO */}
+                    </div>                    {/* EDIT CLIENT PHOTO */}
                     <div className="w-full max-w-[240px] lg:w-[240px] mx-auto lg:mx-0 flex-shrink-0 flex flex-col">
                       <label className="mb-3 block text-sm uppercase tracking-[2px] text-[#D4AF37] font-semibold">
                         Client Photo
                       </label>
-                      <div className="relative aspect-[3/4] w-full rounded-[22px] border border-[#D4AF37]/10 bg-black/40 overflow-hidden flex flex-col items-center justify-center p-3">
-                        {selectedClient.client_photo ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img
-                            src={selectedClient.client_photo}
-                            alt="Client"
-                            className="absolute inset-0 w-full h-full object-cover"
-                          />
-                        ) : (
-                          <div className="text-center p-4">
-                            <Users className="text-neutral-500 mx-auto mb-2" size={24} />
-                            <span className="text-xs text-neutral-500 uppercase tracking-wider font-bold">No Photo</span>
-                          </div>
-                        )}
-                      </div>
                       
-                      <div className="mt-4 flex flex-col gap-2">
-                        <label className="w-full rounded-full border border-[#D4AF37]/20 bg-black/40 py-3 text-center text-xs font-semibold text-[#D4AF37] cursor-pointer hover:bg-[#D4AF37]/10 transition flex items-center justify-center gap-2">
-                          <Upload size={14} />
-                          <span>Change Photo</span>
-                          <input
-                            type="file"
-                            accept="image/*"
-                            onChange={(e) => {
-                              const file = e.target.files?.[0];
-                              if (file) {
-                                const maxSizeBytes = 10 * 1024 * 1024; // 10MB
-                                if (file.size > maxSizeBytes) {
-                                  alert("Photo size must be less than 10MB.");
-                                  return;
-                                }
+                      <label className="relative aspect-square w-full rounded-[22px] border border-[#D4AF37]/20 bg-black/40 overflow-hidden flex flex-col items-center justify-center cursor-pointer group transition-all duration-300 hover:border-[#D4AF37]/50 hover:shadow-[0_0_15px_rgba(212,175,55,0.1)]">
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              const maxSizeBytes = 10 * 1024 * 1024; // 10MB
+                              if (file.size > maxSizeBytes) {
+                                alert("Photo size must be less than 10MB.");
+                                return;
+                              }
 
-                                const reader = new FileReader();
-                                reader.onload = (event) => {
-                                  const img = new window.Image();
-                                  img.src = event.target?.result as string;
-                                  img.onerror = () => {
-                                    alert("Invalid or corrupted image file. Please upload a valid photo.");
+                              const reader = new FileReader();
+                              reader.onload = (event) => {
+                                const img = new window.Image();
+                                img.src = event.target?.result as string;
+                                img.onerror = () => {
+                                  alert("Invalid or corrupted image file. Please upload a valid photo.");
+                                  setSelectedClient({
+                                    ...selectedClient,
+                                    client_photo: ""
+                                  });
+                                };
+                                img.onload = () => {
+                                  const canvas = document.createElement("canvas");
+                                  let width = img.width;
+                                  let height = img.height;
+
+                                  const maxDimension = 600;
+                                  if (width > maxDimension || height > maxDimension) {
+                                    if (width > height) {
+                                      height = Math.round((height * maxDimension) / width);
+                                      width = maxDimension;
+                                    } else {
+                                      width = Math.round((width * maxDimension) / height);
+                                      height = maxDimension;
+                                    }
+                                  }
+
+                                  canvas.width = width;
+                                  canvas.height = height;
+
+                                  const ctx = canvas.getContext("2d");
+                                  if (ctx) {
+                                    ctx.drawImage(img, 0, 0, width, height);
+                                    const compressedDataUrl = canvas.toDataURL("image/jpeg", 0.75);
                                     setSelectedClient({
                                       ...selectedClient,
-                                      client_photo: ""
+                                      client_photo: compressedDataUrl
                                     });
-                                  };
-                                  img.onload = () => {
-                                    const canvas = document.createElement("canvas");
-                                    let width = img.width;
-                                    let height = img.height;
-
-                                    const maxDimension = 600;
-                                    if (width > maxDimension || height > maxDimension) {
-                                      if (width > height) {
-                                        height = Math.round((height * maxDimension) / width);
-                                        width = maxDimension;
-                                      } else {
-                                        width = Math.round((width * maxDimension) / height);
-                                        height = maxDimension;
-                                      }
-                                    }
-
-                                    canvas.width = width;
-                                    canvas.height = height;
-
-                                    const ctx = canvas.getContext("2d");
-                                    if (ctx) {
-                                      ctx.drawImage(img, 0, 0, width, height);
-                                      const compressedDataUrl = canvas.toDataURL("image/jpeg", 0.75);
-                                      setSelectedClient({
-                                        ...selectedClient,
-                                        client_photo: compressedDataUrl
-                                      });
-                                    }
-                                  };
+                                  }
                                 };
-                                reader.readAsDataURL(file);
-                              }
-                            }}
-                            className="hidden"
-                          />
-                        </label>
-                        {selectedClient.client_photo && (
-                          <button
-                            type="button"
-                            onClick={() => setSelectedClient({ ...selectedClient, client_photo: "" })}
-                            className="w-full py-2 text-xs font-semibold text-red-400 underline cursor-pointer"
-                          >
-                            Remove Photo
-                          </button>
+                              };
+                              reader.readAsDataURL(file);
+                            }
+                          }}
+                          className="hidden"
+                        />
+
+                        {selectedClient.client_photo ? (
+                          <>
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={selectedClient.client_photo}
+                              alt="Client"
+                              className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                            />
+                            {/* Premium Hover Overlay */}
+                            <div className="absolute inset-0 bg-black/75 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col items-center justify-center gap-3 p-4">
+                              <div className="flex items-center gap-2 text-[#D4AF37] text-xs font-semibold bg-[#D4AF37]/10 px-3 py-2 rounded-xl border border-[#D4AF37]/20 hover:bg-[#D4AF37]/20 transition w-full justify-center">
+                                <Upload size={14} />
+                                <span>Change Photo</span>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  setSelectedClient({ ...selectedClient, client_photo: "" });
+                                }}
+                                className="text-red-400 text-[11px] font-semibold hover:underline mt-1 bg-red-500/10 hover:bg-red-500/20 px-3 py-2 rounded-xl border border-red-500/20 transition w-full text-center"
+                              >
+                                Remove Photo
+                              </button>
+                            </div>
+                          </>
+                        ) : (
+                          <div className="text-center p-4 transition-transform duration-300 group-hover:scale-102">
+                            <div className="mx-auto w-10 h-10 rounded-full bg-[#D4AF37]/10 flex items-center justify-center mb-2 group-hover:bg-[#D4AF37]/20 group-hover:scale-110 transition-all duration-300">
+                              <Upload className="text-[#D4AF37]" size={20} />
+                            </div>
+                            <span className="text-xs font-bold text-neutral-400 group-hover:text-neutral-300 transition-colors uppercase tracking-wider block">Upload Photo</span>
+                            <span className="text-[10px] text-neutral-500 mt-1 block">Click to browse</span>
+                          </div>
                         )}
-                      </div>
+                      </label>
                     </div>
                   </div>
 

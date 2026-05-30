@@ -1204,62 +1204,68 @@ export default function Home() {
 
       {/* PHOTO UPLOAD */}
       <div 
-        className="w-full max-w-[280px] lg:w-[280px] mx-auto lg:mx-0 flex-shrink-0 flex flex-col"
+        className="w-full max-w-[268px] lg:w-[268px] mx-auto lg:mx-0 flex-shrink-0 flex flex-col"
         data-error-key="clientPhoto"
       >
         <label className="block text-[#D4AF37] uppercase text-sm tracking-[2px] font-semibold mb-3">
           Client Photo
         </label>
         
-        <div className={`relative aspect-[3/4] w-full rounded-2xl border bg-black/50 overflow-hidden flex flex-col items-center justify-center p-3 ${
-          validationErrors.clientPhoto ? "border-red-500" : "border-[#D4AF37]/20"
+        <label className={`relative aspect-square w-full rounded-2xl border bg-black/50 overflow-hidden flex flex-col items-center justify-center cursor-pointer group transition-all duration-300 ${
+          validationErrors.clientPhoto 
+            ? "border-red-500 shadow-[0_0_15px_rgba(239,68,68,0.15)] hover:border-red-400" 
+            : "border-[#D4AF37]/20 hover:border-[#D4AF37]/50 hover:shadow-[0_0_15px_rgba(212,175,55,0.1)]"
         }`}>
+          <input
+            type="file"
+            accept="image/*"
+            onChange={handlePhotoUpload}
+            className="hidden"
+          />
+          
           {clientPhoto ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={clientPhoto}
-              alt="Uploaded client"
-              className="absolute inset-0 w-full h-full object-cover"
-            />
+            <>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={clientPhoto}
+                alt="Uploaded client"
+                className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+              />
+              {/* Premium Hover Overlay */}
+              <div className="absolute inset-0 bg-black/75 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col items-center justify-center gap-3 p-4">
+                <div className="flex items-center gap-2 text-[#D4AF37] text-sm font-semibold bg-[#D4AF37]/10 px-3.5 py-2.5 rounded-xl border border-[#D4AF37]/20 hover:bg-[#D4AF37]/20 transition w-full justify-center">
+                  <Upload size={16} />
+                  <span>Change Photo</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setClientPhoto("");
+                  }}
+                  className="text-red-400 text-xs font-semibold hover:underline mt-1 bg-red-500/10 hover:bg-red-500/20 px-3.5 py-2.5 rounded-xl border border-red-500/20 transition w-full text-center"
+                >
+                  Remove Photo
+                </button>
+              </div>
+            </>
           ) : (
-            <div className="text-center p-4">
-              <div className="mx-auto w-12 h-12 rounded-full bg-[#D4AF37]/10 flex items-center justify-center mb-3">
+            <div className="text-center p-4 transition-transform duration-300 group-hover:scale-102">
+              <div className="mx-auto w-12 h-12 rounded-full bg-[#D4AF37]/10 flex items-center justify-center mb-3 group-hover:bg-[#D4AF37]/20 group-hover:scale-110 transition-all duration-300">
                 <Upload className="text-[#D4AF37]" size={24} />
               </div>
-              <p className="text-sm font-semibold text-neutral-400">Client Photo</p>
-              <p className="text-xs text-neutral-500 mt-1">Upload a photo (Max 10MB)</p>
+              <p className="text-sm font-semibold text-neutral-400 group-hover:text-neutral-300 transition-colors">Upload Photo</p>
+              <p className="text-xs text-neutral-500 mt-1">Click to browse (Max 10MB)</p>
             </div>
           )}
-        </div>
+        </label>
         
-        <div className="mt-4 flex flex-col gap-2">
-          <label className="w-full rounded-2xl border border-[#D4AF37]/30 bg-[#D4AF37]/10 hover:bg-[#D4AF37]/20 py-3.5 text-sm font-semibold text-[#D4AF37] text-center cursor-pointer transition flex items-center justify-center gap-2">
-            <Upload size={16} />
-            <span>{clientPhoto ? "Change Photo" : "Upload Photo"}</span>
-            <input
-              type="file"
-              accept="image/*"
-              onChange={handlePhotoUpload}
-              className="hidden"
-            />
-          </label>
-          
-          {clientPhoto && (
-            <button
-              type="button"
-              onClick={() => setClientPhoto("")}
-              className="w-full py-2 text-xs font-semibold text-red-400 underline cursor-pointer"
-            >
-              Remove Photo
-            </button>
-          )}
-
-          {validationErrors.clientPhoto && (
-            <p className="mt-1 text-sm text-red-400 text-center">
-              {validationErrors.clientPhoto}
-            </p>
-          )}
-        </div>
+        {validationErrors.clientPhoto && (
+          <p className="mt-2 text-sm text-red-400 text-center">
+            {validationErrors.clientPhoto}
+          </p>
+        )}
       </div>
     </div>
 
