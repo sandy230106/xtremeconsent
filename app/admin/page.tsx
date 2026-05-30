@@ -2417,17 +2417,38 @@ async function downloadConsentPdf(
     return pm;
   };
 
+  const lookupAnswer = (questionEn: string): string => {
+    if (!client.questionnaire) return "--";
+    if (client.questionnaire[questionEn]) return client.questionnaire[questionEn];
+    
+    // Trim/case-insensitive match
+    const foundEntry = Object.entries(client.questionnaire).find(
+      ([key]) => key.trim().toLowerCase() === questionEn.trim().toLowerCase()
+    );
+    if (foundEntry) return foundEntry[1];
+    
+    // Fuzzy match (strip spaces and question marks)
+    const normalize = (s: string) => s.replace(/[?\s]/g, "").toLowerCase();
+    const fuzzyEntry = Object.entries(client.questionnaire).find(
+      ([key]) => normalize(key) === normalize(questionEn)
+    );
+    if (fuzzyEntry) return fuzzyEntry[1];
+    
+    return "--";
+  };
+
   const questionRow = (
-    question: string,
+    index: number,
+    questionEn: string,
+    questionTa: string,
     answer: string
   ) => {
-    const questionFromState = questionsList.find(q => q.question_en === question);
-    const tamilText = questionTranslations[question] || questionFromState?.question_ta || "";
-
-    const enLines = safeSplitText(String(question || ""), contentWidth - 28);
+    const enText = `${index}. ${questionEn}`;
+    const enLines = safeSplitText(enText, contentWidth - 28);
+    
     let taLines: string[] = [];
-    if (hasTamilFont && tamilText) {
-      taLines = safeSplitText(`   ${tamilText}`, contentWidth - 32);
+    if (hasTamilFont && questionTa) {
+      taLines = safeSplitText(`   ${questionTa}`, contentWidth - 32);
     }
     
     const enHeight = enLines.length * 5;
@@ -2686,19 +2707,85 @@ async function downloadConsentPdf(
     "Health Declaration / உடல்நல அறிவிப்பு"
   );
 
+  const sType = client.service_type || "Tattoo";
+  
+  // Custom texts based on service type
+  const dynamicProcedure = {
+    Tattoo: "tattoo procedure",
+    PMU: "PMU treatment",
+    Piercing: "piercing procedure",
+    "Tattoo Removal": "tattoo removal procedure"
+  };
+
+  const dynamicType = {
+    Tattoo: "permanent body art",
+    PMU: "semi-permanent cosmetic procedure",
+    Piercing: "body piercing treatment",
+    "Tattoo Removal": "tattoo fading/removal process"
+  };
+
+  const dynamicTamilFirstQuestion = {
+    Tattoo: "இது உங்கள் முதல் tattoo ஆகுமா?",
+    PMU: "இது உங்கள் முதல் PMU treatment ஆகுமா?",
+    Piercing: "இது உங்கள் முதல் piercing ஆகுமா?",
+    "Tattoo Removal": "இது உங்கள் முதல் tattoo removal session ஆகுமா?"
+  };
+
+  const procedureEn = dynamicProcedure[sType] || dynamicProcedure.Tattoo;
+  const typeEn = dynamicType[sType] || dynamicType.Tattoo;
+
+  const pdfQuestions = [
+    {
+      en: "Are you above 18 years old?",
+      ta: "உங்களுக்கு 18 வயதிற்கு மேல் உள்ளதா?"
+    },
+    {
+      en: sType === "PMU" ? "Are you pregnant or breastfeeding?" : "Are you pregnant or breastfeeding",
+      ta: "நீங்கள் கர்ப்பமாக உள்ளீர்களா அல்லது குழந்தைக்கு பாலூட்டுகிறீர்களா?"
+    },
+    {
+      en: sType === "PMU" ? "Do you have diabetes?" : "Do you have diabetes, blood pressure or medical conditions?",
+      ta: sType === "PMU" ? "உங்களுக்கு நீரிழிவு நோய் உள்ளதா?" : "உங்களுக்கு சக்கரை நோய், ரத்த அழுத்தம் அல்லது மருத்துவநிலைகள் உள்ளதா??"
+    },
+    {
+      en: sType === "PMU" ? "Do you have any skin disease, allergy, or infection?" : `Do you have skin issues or conditions that may affect ${procedureEn}?`,
+      ta: "தோல் நோய், அலர்ஜி அல்லது தொற்று உள்ளதா?"
+    },
+    {
+      en: "Have you used alcohol, weed, or recreational drugs recently?",
+      ta: "நீங்கள் சமீபத்தில் மதுபானம், கஞ்சா அல்லது வேடிக்கை மருந்துகளை பயன்படுத்தியுள்ளீர்களா?"
+    },
+    {
+      en: "Have you eaten food today?",
+      ta: "இன்று உணவு சாப்பிட்டீர்களா?"
+    },
+    {
+      en: sType === "PMU" ? "Is this your first PMU treatment?" : sType === "Piercing" ? "Is this your first piercing?" : sType === "Tattoo Removal" ? "Is this your first tattoo removal session?" : "Is this your first tattoo?",
+      ta: dynamicTamilFirstQuestion[sType] || dynamicTamilFirstQuestion.Tattoo
+    },
+    {
+      en: sType === "PMU" ? "Are you taking blood thinners?" : "Are you taking any medications?",
+      ta: sType === "PMU" ? "ரத்தத்தை நீர்த்தாக்கும் மருந்துகள் எடுத்துக்கொள்கிறீர்களா?" : "நீங்கள் தற்போது மருந்துகள் எடுத்துக்கொள்கிறீர்களா?"
+    },
+    {
+      en: "Do you have epilepsy or seizures?",
+      ta: "உங்களுக்கு மயக்கம் அல்லது மிதக்கத் தாக்கங்கள் உள்ளதா?"
+    },
+    {
+      en: sType === "PMU" ? "Have you recently undergone cosmetic treatment?" : `Have you recently undergone treatment related to ${typeEn}?`,
+      ta: "நீங்கள் சமீபத்தில் அழகுசார் சிகிச்சை பெற்றுள்ளீர்களா?"
+    },
+    {
+      en: "Do you have any medical condition we should know about?",
+      ta: "எங்களுக்கு தெரிய வேண்டிய உடல்நல பிரச்சனை ஏதேனும் உள்ளதா?"
+    }
+  ];
+
   if (client.questionnaire) {
-    Object.entries(
-      client.questionnaire
-    ).forEach(
-      ([
-        question,
-        answer,
-      ]) =>
-        questionRow(
-          question,
-          answer
-        )
-    );
+    pdfQuestions.forEach((q, index) => {
+      const answer = lookupAnswer(q.en);
+      questionRow(index + 1, q.en, q.ta, answer);
+    });
   } else {
     field(
       "Answers / பதில்கள்",
@@ -2757,7 +2844,6 @@ async function downloadConsentPdf(
     },
   };
 
-  const sType = client.service_type || "Tattoo";
   const contentVars = dynamicContent[sType] || dynamicContent["Tattoo"];
 
   const consentStatements = [
@@ -2800,6 +2886,77 @@ async function downloadConsentPdf(
   ];
 
   consentStatements.forEach((item, index) => {
+    const enText = `${index + 1}. ${item.en}`;
+    const enLines = safeSplitText(enText, contentWidth);
+    
+    const taText = `    ${item.ta}`;
+    let taLines: string[] = [];
+    if (hasTamilFont) {
+      taLines = safeSplitText(taText, contentWidth - 4);
+    }
+
+    const enHeight = enLines.length * 5;
+    const taHeight = taLines.length * 5;
+    const totalHeight = enHeight + (taLines.length > 0 ? taHeight + 2 : 0) + 4;
+
+    ensureSpace(totalHeight);
+
+    // Draw English
+    safeText(enLines, margin, y, 9.5, "normal");
+    y += enHeight + 1.5;
+
+    // Draw Tamil
+    if (hasTamilFont && taLines.length > 0) {
+      pdf.setFont("Lohit-Tamil", "normal");
+      pdf.setFontSize(8.5);
+      pdf.setTextColor(80, 80, 80); // Subtle charcoal for translation
+      pdf.text(taLines, margin + 2, y);
+      y += taHeight;
+    }
+
+    y += 3; // Space between items
+  });
+
+  const dynamicAftercare = {
+    Tattoo: "Follow all tattoo aftercare instructions provided by your tattoo artist.",
+    PMU: "Avoid water, makeup and sweating during healing.",
+    Piercing: "Follow all piercing aftercare instructions carefully.",
+    "Tattoo Removal": "Avoid direct sunlight and follow removal aftercare instructions."
+  };
+
+  const dynamicTamilAftercare = {
+    Tattoo: "உங்கள் tattoo artist வழங்கும் aftercare வழிமுறைகளை சரியாக பின்பற்ற வேண்டும்.",
+    PMU: "healing காலத்தில் தண்ணீர், makeup மற்றும் sweating தவிர்க்க வேண்டும்.",
+    Piercing: "piercing aftercare வழிமுறைகளை சரியாக பின்பற்ற வேண்டும்.",
+    "Tattoo Removal": "நேரடி வெயிலை தவிர்த்து aftercare வழிமுறைகளை பின்பற்ற வேண்டும்."
+  };
+
+  const aftercareStatements = [
+    {
+      en: dynamicAftercare[sType] || dynamicAftercare.Tattoo,
+      ta: dynamicTamilAftercare[sType] || dynamicTamilAftercare.Tattoo
+    },
+    {
+      en: "Avoid touching treated area.",
+      ta: "சிகிச்சை செய்யப்பட்ட பகுதியை தொட வேண்டாம்."
+    },
+    {
+      en: "Avoid swimming, sweating and irritation.",
+      ta: "Swimming, sweating மற்றும் irritation தவிர்க்கவும்."
+    },
+    {
+      en: "Do not scratch healing skin.",
+      ta: "Healing skin-ஐ scratch செய்ய வேண்டாம்."
+    },
+    {
+      en: "Follow artist instructions carefully.",
+      ta: "Artist வழங்கும் வழிமுறைகளை கவனமாக பின்பற்றவும்."
+    }
+  ];
+
+  section("Aftercare Acknowledgment / பிந்தைய பராமரிப்பு ஒப்புதல்");
+
+  aftercareStatements.forEach((item, index) => {
     const enText = `${index + 1}. ${item.en}`;
     const enLines = safeSplitText(enText, contentWidth);
     
