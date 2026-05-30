@@ -2239,6 +2239,11 @@ async function downloadConsentPdf(
     }
   };
 
+  const safeSplitText = (textStr: string, width: number): string[] => {
+    setPdfFont("helvetica", "normal");
+    return pdf.splitTextToSize(String(textStr || ""), width) as string[];
+  };
+
   // Layout constants
   const pageWidth = pdf.internal.pageSize.getWidth();
   const pageHeight = pdf.internal.pageSize.getHeight();
@@ -2361,12 +2366,7 @@ async function downloadConsentPdf(
     width = contentWidth
   ) => {
     const displayValue = String(value || "--");
-    if (hasTamilFont && containsTamil(displayValue)) {
-      setPdfFont("Lohit-Tamil", "normal");
-    } else {
-      setPdfFont("helvetica", "normal");
-    }
-    const lines = pdf.splitTextToSize(displayValue, width) as string[];
+    const lines = safeSplitText(displayValue, width);
     const height = 9 + lines.length * lineHeight;
 
     ensureSpace(height);
@@ -2406,12 +2406,10 @@ async function downloadConsentPdf(
     const questionFromState = questionsList.find(q => q.question_en === question);
     const tamilText = questionTranslations[question] || questionFromState?.question_ta || "";
 
-    const enLines = pdf.splitTextToSize(String(question || ""), contentWidth - 28) as string[];
+    const enLines = safeSplitText(String(question || ""), contentWidth - 28);
     let taLines: string[] = [];
     if (hasTamilFont && tamilText) {
-      setPdfFont("Lohit-Tamil", "normal");
-      pdf.setFontSize(8.5);
-      taLines = pdf.splitTextToSize(`   ${tamilText}`, contentWidth - 32) as string[];
+      taLines = safeSplitText(`   ${tamilText}`, contentWidth - 32);
     }
     
     const enHeight = enLines.length * 5;
@@ -2793,21 +2791,13 @@ async function downloadConsentPdf(
   ];
 
   consentStatements.forEach((item, index) => {
-    // English part
-    pdf.setFont("helvetica", "normal");
-    pdf.setFontSize(9.5);
-    pdf.setTextColor(26, 26, 26);
-    
     const enText = `${index + 1}. ${item.en}`;
-    const enLines = pdf.splitTextToSize(enText, contentWidth) as string[];
+    const enLines = safeSplitText(enText, contentWidth);
     
-    // Tamil part
     const taText = `    ${item.ta}`;
     let taLines: string[] = [];
     if (hasTamilFont) {
-      pdf.setFont("Lohit-Tamil", "normal");
-      pdf.setFontSize(8.5);
-      taLines = pdf.splitTextToSize(taText, contentWidth - 4) as string[];
+      taLines = safeSplitText(taText, contentWidth - 4);
     }
 
     const enHeight = enLines.length * 5;
