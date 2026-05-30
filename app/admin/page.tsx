@@ -2303,18 +2303,22 @@ async function downloadConsentPdf(
     fontSize: number,
     isBold = false,
     color = "#111111",
-    maxWidth = contentWidth
+    maxWidth = contentWidth,
+    dryRun = false
   ): number => {
     if (!containsTamil(textStr)) {
-      const r = color.startsWith("#") ? parseInt(color.slice(1,3), 16) : 0;
-      const g = color.startsWith("#") ? parseInt(color.slice(3,5), 16) : 0;
-      const b = color.startsWith("#") ? parseInt(color.slice(5,7), 16) : 0;
-      pdf.setTextColor(r, g, b);
-      setPdfFont("helvetica", isBold ? "bold" : "normal");
-      pdf.setFontSize(fontSize);
-      const cleanLine = textStr.replace(/[^\x00-\x7F]/g, "");
-      pdf.text(cleanLine, x, yPos);
-      return fontSize * 0.35 + 1.5; // spacing in mm
+      const spacingMm = fontSize * 0.35 + 1.5;
+      if (!dryRun) {
+        const r = color.startsWith("#") ? parseInt(color.slice(1,3), 16) : 0;
+        const g = color.startsWith("#") ? parseInt(color.slice(3,5), 16) : 0;
+        const b = color.startsWith("#") ? parseInt(color.slice(5,7), 16) : 0;
+        pdf.setTextColor(r, g, b);
+        setPdfFont("helvetica", isBold ? "bold" : "normal");
+        pdf.setFontSize(fontSize);
+        const cleanLine = textStr.replace(/[^\x00-\x7F]/g, "");
+        pdf.text(cleanLine, x, yPos);
+      }
+      return spacingMm; // spacing in mm
     }
 
     const canvas = document.createElement("canvas");
@@ -2345,8 +2349,13 @@ async function downloadConsentPdf(
       lines.push(currentLine);
     }
 
-    let currentY = yPos;
     const spacingMm = (fontSize * 0.35) + 1.8;
+
+    if (dryRun) {
+      return lines.length * spacingMm;
+    }
+
+    let currentY = yPos;
 
     lines.forEach((line) => {
       const lineCanvas = document.createElement("canvas");
@@ -2364,6 +2373,7 @@ async function downloadConsentPdf(
 
       lineCtx.font = `${isBold ? "bold" : "normal"} ${lineFontPx}px ${fontName}`;
       lineCtx.textBaseline = "middle";
+      ctx.fillStyle = color;
       lineCtx.fillStyle = color;
       
       lineCtx.imageSmoothingEnabled = true;
@@ -2393,15 +2403,17 @@ async function downloadConsentPdf(
     yPos: number,
     fontSize: number,
     style: "normal" | "bold" = "normal",
-    color = "#111111"
-  ) => {
+    color = "#111111",
+    dryRun = false
+  ): number => {
     const lines = Array.isArray(textLines) ? textLines.map(l => String(l || "")) : [String(textLines || "")];
     let currentY = yPos;
     lines.forEach((line) => {
       const isBold = style === "bold";
-      const heightUsed = drawTamilText(line, x, currentY, fontSize, isBold, color, pageWidth - margin - x);
+      const heightUsed = drawTamilText(line, x, currentY, fontSize, isBold, color, pageWidth - margin - x, dryRun);
       currentY += heightUsed;
     });
+    return currentY - yPos;
   };
 
   const text = (
@@ -2436,14 +2448,14 @@ async function downloadConsentPdf(
   ) => {
     const displayValue = String(value || "--");
     const lines = safeSplitText(displayValue, width);
-    const height = 9 + lines.length * 5;
+    const height = 11 + lines.length * 5.8;
 
     ensureSpace(height);
-    safeText(String(label || "").toUpperCase(), xPos, y, 9, "bold", "#444444");
+    safeText(String(label || "").toUpperCase(), xPos, y, 10.5, "bold", "#444444");
     
-    y += 4.5;
-    safeText(lines, xPos, y, 10, "bold", "#000000");
-    y += lines.length * 5 + 1.5;
+    y += 5.2;
+    safeText(lines, xPos, y, 12, "bold", "#000000");
+    y += lines.length * 5.5 + 2;
   };
 
   const questionTranslations: Record<string, string> = {
@@ -2526,27 +2538,27 @@ async function downloadConsentPdf(
       taLines = [questionTa];
     }
     
-    const enHeight = enLines.length * 5;
-    const taHeight = taLines.length * 5;
-    const height = Math.max(enHeight + (taLines.length > 0 ? taHeight + 1.5 : 0) + 4, 12);
+    const enHeight = enLines.length * 5.8;
+    const taHeight = taLines.length * 5.8;
+    const height = Math.max(enHeight + (taLines.length > 0 ? taHeight + 2 : 0) + 5, 14);
 
     ensureSpace(height);
 
-    safeText(enLines, margin, y, 9.5, "bold", "#111111");
-    safeText(translateAnswer(answer), pageWidth - margin - 25, y, 9.5, "bold", "#111111");
+    safeText(enLines, margin, y, 11, "bold", "#111111");
+    safeText(translateAnswer(answer), pageWidth - margin - 25, y, 11, "bold", "#111111");
 
-    y += enHeight + 1;
+    y += enHeight + 1.5;
 
     if (taLines.length > 0) {
-      safeText(taLines, margin + 2, y, 8.5, "bold", "#333333");
+      safeText(taLines, margin + 2, y, 10, "bold", "#333333");
       y += taHeight;
     }
 
     pdf.setDrawColor(230, 230, 230);
     pdf.setLineWidth(0.15);
-    pdf.line(margin, y + 2, pageWidth - margin, y + 2);
+    pdf.line(margin, y + 2.5, pageWidth - margin, y + 2.5);
 
-    y += 5;
+    y += 6.5;
   };
 
   const addSignature = (
@@ -2953,28 +2965,23 @@ async function downloadConsentPdf(
     const enText = `${index + 1}. ${item.en}`;
     const enLines = safeSplitText(enText, contentWidth);
     
-    let taLines: string[] = [];
-    if (item.ta) {
-      taLines = [item.ta];
-    }
-
-    const enHeight = enLines.length * 4.8;
-    const taHeight = taLines.length * 4.8;
-    const totalHeight = enHeight + (taLines.length > 0 ? taHeight + 1.2 : 0) + 3;
+    const enHeight = safeText(enLines, margin, y, 11.5, "bold", "#000000", true);
+    const taHeight = item.ta ? safeText([item.ta], margin + 4, y, 10.5, "bold", "#222222", true) : 0;
+    const totalHeight = enHeight + (item.ta ? taHeight + 2 : 0) + 5;
 
     ensureSpace(totalHeight);
 
-    // Draw English: bold, 9.5pt, pure black
-    safeText(enLines, margin, y, 9.5, "bold", "#000000");
-    y += enHeight + 1.0;
+    // Draw English: bold, 11.5pt, pure black
+    safeText(enLines, margin, y, 11.5, "bold", "#000000");
+    y += enHeight + 1.8;
 
-    // Draw Tamil: bold, 9pt, dark charcoal
-    if (taLines.length > 0) {
-      safeText(taLines, margin + 4, y, 9, "bold", "#222222");
+    // Draw Tamil: bold, 10.5pt, dark charcoal
+    if (item.ta) {
+      safeText([item.ta], margin + 4, y, 10.5, "bold", "#222222");
       y += taHeight;
     }
 
-    y += 2.5; // Space between items
+    y += 5.5; // Space between items - expanded to use page elegantly
   });
 
   // Signatures on Page 3
@@ -3037,45 +3044,24 @@ async function downloadConsentPdf(
     const enText = `${index + 1}. ${item.en}`;
     const enLines = safeSplitText(enText, contentWidth);
     
-    let taLines: string[] = [];
-    if (item.ta) {
-      taLines = [item.ta];
-    }
-
-    const enHeight = enLines.length * 4.8;
-    const taHeight = taLines.length * 4.8;
-    const totalHeight = enHeight + (taLines.length > 0 ? taHeight + 1.2 : 0) + 3;
+    const enHeight = safeText(enLines, margin, y, 12, "bold", "#000000", true);
+    const taHeight = item.ta ? safeText([item.ta], margin + 4, y, 11, "bold", "#222222", true) : 0;
+    const totalHeight = enHeight + (item.ta ? taHeight + 2 : 0) + 5;
 
     ensureSpace(totalHeight);
 
-    // Draw English: bold, 9.5pt, pure black
-    safeText(enLines, margin, y, 9.5, "bold", "#000000");
-    y += enHeight + 1.0;
+    // Draw English: bold, 12pt, pure black
+    safeText(enLines, margin, y, 12, "bold", "#000000");
+    y += enHeight + 2.0;
 
-    // Draw Tamil: bold, 9pt, dark charcoal
-    if (taLines.length > 0) {
-      safeText(taLines, margin + 4, y, 9, "bold", "#222222");
+    // Draw Tamil: bold, 11pt, dark charcoal
+    if (item.ta) {
+      safeText([item.ta], margin + 4, y, 11, "bold", "#222222");
       y += taHeight;
     }
 
-    y += 2.5; // Space between items
+    y += 8.0; // Space between items - expanded to use the page beautifully since signatures are removed
   });
-
-  // Signatures on Page 4
-  section("Signature Verification / கையொப்பம் சரிபார்ப்பு");
-  ensureSpace(45);
-  addSignature(
-    "Customer Signature / வாடிக்கையாளர் கையொப்பம்",
-    client.customer_signature,
-    margin
-  );
-  addSignature(
-    "Artist Signature / கலைஞர் கையொப்பம்",
-    client.artist_signature,
-    pageWidth / 2 + 5
-  );
-
-  y += 42;
 
   const fileName =
     `${client.name || "client"}-consent.pdf`.replace(
