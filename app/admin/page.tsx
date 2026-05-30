@@ -2429,15 +2429,32 @@ async function downloadConsentPdf(
   const section = (
     title: string
   ) => {
-    ensureSpace(24);
-    y += 2;
-    pdf.setFillColor(26, 26, 26);
-    pdf.rect(margin, y, contentWidth, 11, "F");
-    
-    safeText(String(title || "").toUpperCase(), margin + 3, y + 7.8, 13.5, "bold", "#D4AF37");
-    
-    pdf.setTextColor(0, 0, 0);
-    y += 15;
+    const parts = title.split(" / ");
+    const enTitle = parts[0];
+    const taTitle = parts[1] || "";
+
+    if (taTitle) {
+      ensureSpace(28);
+      y += 2;
+      pdf.setFillColor(26, 26, 26);
+      pdf.rect(margin, y, contentWidth, 16, "F");
+
+      safeText(String(enTitle || "").toUpperCase(), margin + 3, y + 6.2, 13, "bold", "#D4AF37");
+      safeText(taTitle, margin + 3, y + 12.2, 12, "bold", "#D4AF37");
+
+      pdf.setTextColor(0, 0, 0);
+      y += 21;
+    } else {
+      ensureSpace(24);
+      y += 2;
+      pdf.setFillColor(26, 26, 26);
+      pdf.rect(margin, y, contentWidth, 11, "F");
+
+      safeText(String(title || "").toUpperCase(), margin + 3, y + 7.8, 13.5, "bold", "#D4AF37");
+
+      pdf.setTextColor(0, 0, 0);
+      y += 16;
+    }
   };
 
   const field = (
@@ -2447,15 +2464,31 @@ async function downloadConsentPdf(
     xPos = margin
   ) => {
     const displayValue = String(value || "--");
-    const lines = safeSplitText(displayValue, width);
-    const height = 11 + lines.length * 5.8;
+    const valueLines = safeSplitText(displayValue, width);
 
-    ensureSpace(height);
-    safeText(String(label || "").toUpperCase(), xPos, y, 10.5, "bold", "#444444");
-    
-    y += 5.2;
-    safeText(lines, xPos, y, 12, "bold", "#000000");
-    y += lines.length * 5.5 + 2;
+    const labelParts = label.split(" / ");
+    const enLabel = labelParts[0];
+    const taLabel = labelParts[1] || "";
+
+    const enLabelHeight = safeText(enLabel.toUpperCase(), xPos, y, 10.5, "bold", "#444444", true);
+    const taLabelHeight = taLabel ? safeText([taLabel], xPos, y, 9.5, "bold", "#666666", true) : 0;
+    const valueHeight = safeText(valueLines, xPos, y, 12, "bold", "#000000", true);
+
+    const totalHeight = enLabelHeight + (taLabel ? taLabelHeight + 1.5 : 0) + 2.0 + valueHeight + 3.2;
+    ensureSpace(totalHeight);
+
+    safeText(enLabel.toUpperCase(), xPos, y, 10.5, "bold", "#444444");
+    y += enLabelHeight + 1.2;
+
+    if (taLabel) {
+      safeText([taLabel], xPos, y, 9.5, "bold", "#666666");
+      y += taLabelHeight + 1.5;
+    } else {
+      y += 1.5;
+    }
+
+    safeText(valueLines, xPos, y, 12, "bold", "#000000");
+    y += valueHeight + 3.2;
   };
 
   const questionTranslations: Record<string, string> = {
