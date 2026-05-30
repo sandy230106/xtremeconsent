@@ -911,7 +911,7 @@ export default function AdminPage() {
                               );
 
                               alert(
-                                "Could not download the PDF. Please try again."
+                                `Could not download the PDF. Error: ${error instanceof Error ? error.message : String(error)}`
                               );
                             }
                           }}
@@ -2516,7 +2516,14 @@ async function downloadConsentPdf(
     // Draw logo on the left side of the header
     const logoWidth = 32;
     const logoHeight = 22;
-    pdf.addImage(logoImg, "JPEG", margin + 4, y + 3, logoWidth, logoHeight);
+    try {
+      pdf.addImage(logoImg, "JPEG", margin + 4, y + 3, logoWidth, logoHeight);
+    } catch (e) {
+      console.warn("Failed to add logo image to PDF:", e);
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(14);
+      pdf.text("LOGO", margin + 12, y + 15);
+    }
   } else {
     // Fallback if logo fails
     pdf.setFont("helvetica", "bold");
