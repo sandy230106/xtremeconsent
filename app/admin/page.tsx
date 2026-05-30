@@ -2417,32 +2417,33 @@ async function downloadConsentPdf(
   const section = (
     title: string
   ) => {
-    ensureSpace(20);
+    ensureSpace(24);
     y += 2;
     pdf.setFillColor(26, 26, 26);
-    pdf.rect(margin, y, contentWidth, 9, "F");
+    pdf.rect(margin, y, contentWidth, 11, "F");
     
-    safeText(String(title || "").toUpperCase(), margin + 3, y + 6.2, 11, "bold", "#D4AF37");
+    safeText(String(title || "").toUpperCase(), margin + 3, y + 7.8, 13.5, "bold", "#D4AF37");
     
     pdf.setTextColor(0, 0, 0);
-    y += 13;
+    y += 15;
   };
 
   const field = (
     label: string,
     value?: string,
-    width = contentWidth
+    width = contentWidth,
+    xPos = margin
   ) => {
     const displayValue = String(value || "--");
     const lines = safeSplitText(displayValue, width);
-    const height = 10 + lines.length * lineHeight;
+    const height = 9 + lines.length * 5;
 
     ensureSpace(height);
-    safeText(String(label || "").toUpperCase(), margin, y, 10, "bold", "#333333");
+    safeText(String(label || "").toUpperCase(), xPos, y, 9, "bold", "#444444");
     
-    y += 5.5;
-    safeText(lines, margin, y, 11, "bold", "#000000");
-    y += lines.length * lineHeight + 3;
+    y += 4.5;
+    safeText(lines, xPos, y, 10, "bold", "#000000");
+    y += lines.length * 5 + 1.5;
   };
 
   const questionTranslations: Record<string, string> = {
@@ -2556,9 +2557,9 @@ async function downloadConsentPdf(
     safeText(label, x, y, 9, "bold");
     pdf.rect(
       x,
-      y + 4,
-      82,
-      32
+      y + 3,
+      80,
+      26
     );
 
     if (signature) {
@@ -2573,10 +2574,10 @@ async function downloadConsentPdf(
         pdf.addImage(
           signature,
           format,
-          x + 4,
-          y + 8,
+          x + 3,
+          y + 6,
           74,
-          22
+          20
         );
       } catch {
         pdf.setFont(
@@ -2586,7 +2587,7 @@ async function downloadConsentPdf(
         pdf.text(
           "Signature image unavailable",
           x + 6,
-          y + 22
+          y + 16
         );
       }
     } else {
@@ -2597,7 +2598,7 @@ async function downloadConsentPdf(
       pdf.text(
         "Not signed",
         x + 28,
-        y + 22
+        y + 16
       );
     }
   };
@@ -2643,12 +2644,12 @@ async function downloadConsentPdf(
 
   // Draw the highlighted Consent Form banner centered
   pdf.setFillColor(26, 26, 26); // Dark Charcoal
-  pdf.rect((pageWidth - 70) / 2, y - 4, 70, 7, "F"); // Background bar for title
+  pdf.rect((pageWidth - 90) / 2, y - 5, 90, 9, "F"); // expanded background bar
 
   pdf.setFont("helvetica", "bold");
-  pdf.setFontSize(11.5);
+  pdf.setFontSize(14); // increased to 14pt
   pdf.setTextColor(212, 175, 55); // Premium Gold
-  pdf.text("CONSENT FORM", pageWidth / 2, y + 1, { align: "center" });
+  pdf.text("CONSENT FORM", pageWidth / 2, y + 1.2, { align: "center" });
 
   // Reset text color to black for normal elements
   pdf.setTextColor(0, 0, 0);
@@ -2677,12 +2678,16 @@ async function downloadConsentPdf(
     pdf.text("(NO PHOTO)", 162, metadataStart + 31);
   }
 
-  // Draw metadata fields on the left side
-  field(
-    "Consent No / ஒப்புதல் எண்",
-    client.form_no,
-    120
-  );
+  // Draw metadata fields in two columns on the left side
+  const colWidth = 60;
+  const col1X = margin; // 14
+  const col2X = margin + 64; // 78
+
+  // Row 1
+  let curY = y;
+  field("Consent No / ஒப்புதல் எண்", client.form_no, colWidth, col1X);
+  let y1 = y;
+  y = curY;
   field(
     "Date / தேதி",
     client.consent_date
@@ -2690,33 +2695,30 @@ async function downloadConsentPdf(
       : client.created_at
       ? formatDate(client.created_at)
       : new Date().toLocaleDateString(),
-    120
+    colWidth,
+    col2X
   );
-  field(
-    "Service / சேவை",
-    client.service_type,
-    120
-  );
-  field(
-    "Payment Mode / கட்டண முறை",
-    translatePaymentMode(client.payment_mode),
-    120
-  );
-  field(
-    "Price / விலை",
-    client.price
-      ? `Rs. ${client.price}`
-      : "",
-    120
-  );
+  y = Math.max(y1, y);
 
+  // Row 2
+  curY = y;
+  field("Service / சேவை", client.service_type, colWidth, col1X);
+  y1 = y;
+  y = curY;
+  field("Payment Mode / கட்டண முறை", translatePaymentMode(client.payment_mode), colWidth, col2X);
+  y = Math.max(y1, y);
+
+  // Row 3
+  curY = y;
+  field("Price / விலை", client.price ? `Rs. ${client.price}` : "", colWidth, col1X);
+  y1 = y;
+  y = curY;
   if (client.service_type === "PMU") {
-    field(
-      "PMU Service / PMU சேவை",
-      client.pmu_service,
-      120
-    );
+    field("PMU Service / PMU சேவை", client.pmu_service, colWidth, col2X);
+  } else {
+    y = y1;
   }
+  y = Math.max(y1, y);
 
   // Ensure y coordinate is past both the metadata fields and the client photo
   y = Math.max(y, metadataStart + 55 + 4);
@@ -2724,48 +2726,49 @@ async function downloadConsentPdf(
   section(
     "Client Details / வாடிக்கையாளர் விவரங்கள்"
   );
-  field(
-    "Client Name / பெயர்",
-    client.name
-  );
-  field(
-    "Phone Number / தொலைபேசி எண்",
-    client.phone
-  );
-  field(
-    "Date Of Birth / பிறந்த தேதி",
-    client.dob
-  );
-  field(
-    "Age / வயது",
-    client.age
-  );
-  field(
-    "Gender / பாலினம்",
-    translateGender(client.gender)
-  );
-  field(
-    "Occupation / தொழில்",
-    client.occupation
-  );
-  field(
-    "Address / முகவரி",
-    client.address
-  );
-  field(
-    "ID Proof / அடையாள சான்று",
-    client.idProof
-  );
-  field(
-    "ID Proof Number / அடையாள சான்று எண்",
-    client.idProofNo
-  );
 
+  const detColWidth = 85;
+  const detCol1X = margin; // 14
+  const detCol2X = margin + 92; // 106
+
+  // Row 1: Name & Phone
+  curY = y;
+  field("Client Name / பெயர்", client.name, detColWidth, detCol1X);
+  y1 = y;
+  y = curY;
+  field("Phone Number / தொலைபேசி எண்", client.phone, detColWidth, detCol2X);
+  y = Math.max(y1, y);
+
+  // Row 2: DOB & Age
+  curY = y;
+  field("Date Of Birth / பிறந்த தேதி", client.dob, detColWidth, detCol1X);
+  y1 = y;
+  y = curY;
+  field("Age / வயது", client.age, detColWidth, detCol2X);
+  y = Math.max(y1, y);
+
+  // Row 3: Gender & Occupation
+  curY = y;
+  field("Gender / பாலினம்", translateGender(client.gender), detColWidth, detCol1X);
+  y1 = y;
+  y = curY;
+  field("Occupation / தொழில்", client.occupation, detColWidth, detCol2X);
+  y = Math.max(y1, y);
+
+  // Row 4: ID Proof & ID Proof Number
+  curY = y;
+  field("ID Proof / அடையாள சான்று", client.idProof, detColWidth, detCol1X);
+  y1 = y;
+  y = curY;
+  field("ID Proof Number / அடையாள சான்று எண்", client.idProofNo, detColWidth, detCol2X);
+  y = Math.max(y1, y);
+
+  // Row 5: Address (Full width for longer text)
+  field("Address / முகவரி", client.address, contentWidth, margin);
+
+  // Row 6: Needle Type (if present, Full width)
   if (client.needleType) {
-    field(
-      "Type Of Needle Used / பயன்படுத்தப்பட்ட ஊசியின் வகை",
-      client.needleType
-    );
+    field("Type Of Needle Used / பயன்படுத்தப்பட்ட ஊசியின் வகை", client.needleType, contentWidth, margin);
   }
 
   pdf.addPage();
@@ -2955,23 +2958,23 @@ async function downloadConsentPdf(
       taLines = [item.ta];
     }
 
-    const enHeight = enLines.length * 5.5;
-    const taHeight = taLines.length * 5.5;
-    const totalHeight = enHeight + (taLines.length > 0 ? taHeight + 2 : 0) + 4;
+    const enHeight = enLines.length * 4.8;
+    const taHeight = taLines.length * 4.8;
+    const totalHeight = enHeight + (taLines.length > 0 ? taHeight + 1.2 : 0) + 3;
 
     ensureSpace(totalHeight);
 
-    // Draw English: bold, 10.5pt, pure black
-    safeText(enLines, margin, y, 10.5, "bold", "#000000");
-    y += enHeight + 1.5;
+    // Draw English: bold, 9.5pt, pure black
+    safeText(enLines, margin, y, 9.5, "bold", "#000000");
+    y += enHeight + 1.0;
 
-    // Draw Tamil: bold, 10pt, dark charcoal
+    // Draw Tamil: bold, 9pt, dark charcoal
     if (taLines.length > 0) {
-      safeText(taLines, margin + 4, y, 10, "bold", "#222222");
+      safeText(taLines, margin + 4, y, 9, "bold", "#222222");
       y += taHeight;
     }
 
-    y += 4; // Space between items
+    y += 2.5; // Space between items
   });
 
   // Signatures on Page 3
@@ -3039,23 +3042,23 @@ async function downloadConsentPdf(
       taLines = [item.ta];
     }
 
-    const enHeight = enLines.length * 5.5;
-    const taHeight = taLines.length * 5.5;
-    const totalHeight = enHeight + (taLines.length > 0 ? taHeight + 2 : 0) + 4;
+    const enHeight = enLines.length * 4.8;
+    const taHeight = taLines.length * 4.8;
+    const totalHeight = enHeight + (taLines.length > 0 ? taHeight + 1.2 : 0) + 3;
 
     ensureSpace(totalHeight);
 
-    // Draw English: bold, 10.5pt, pure black
-    safeText(enLines, margin, y, 10.5, "bold", "#000000");
-    y += enHeight + 1.5;
+    // Draw English: bold, 9.5pt, pure black
+    safeText(enLines, margin, y, 9.5, "bold", "#000000");
+    y += enHeight + 1.0;
 
-    // Draw Tamil: bold, 10pt, dark charcoal
+    // Draw Tamil: bold, 9pt, dark charcoal
     if (taLines.length > 0) {
-      safeText(taLines, margin + 4, y, 10, "bold", "#222222");
+      safeText(taLines, margin + 4, y, 9, "bold", "#222222");
       y += taHeight;
     }
 
-    y += 4; // Space between items
+    y += 2.5; // Space between items
   });
 
   // Signatures on Page 4
