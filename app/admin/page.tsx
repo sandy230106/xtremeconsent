@@ -2998,38 +2998,24 @@ async function downloadConsentPdf(
     const enText = `${index + 1}. ${item.en}`;
     const enLines = safeSplitText(enText, contentWidth);
     
-    const enHeight = safeText(enLines, margin, y, 11.5, "bold", "#000000", true);
-    const taHeight = item.ta ? safeText([item.ta], margin + 4, y, 10.5, "bold", "#222222", true) : 0;
+    const enHeight = safeText(enLines, margin, y, 12, "bold", "#000000", true);
+    const taHeight = item.ta ? safeText([item.ta], margin + 4, y, 11, "bold", "#222222", true) : 0;
     const totalHeight = enHeight + (item.ta ? taHeight + 2 : 0) + 5;
 
     ensureSpace(totalHeight);
 
-    // Draw English: bold, 11.5pt, pure black
-    safeText(enLines, margin, y, 11.5, "bold", "#000000");
-    y += enHeight + 1.8;
+    // Draw English: bold, 12pt, pure black
+    safeText(enLines, margin, y, 12, "bold", "#000000");
+    y += enHeight + 2.0;
 
-    // Draw Tamil: bold, 10.5pt, dark charcoal
+    // Draw Tamil: bold, 11pt, dark charcoal
     if (item.ta) {
-      safeText([item.ta], margin + 4, y, 10.5, "bold", "#222222");
+      safeText([item.ta], margin + 4, y, 11, "bold", "#222222");
       y += taHeight;
     }
 
-    y += 5.5; // Space between items - expanded to use page elegantly
+    y += 7.5; // Space between items - expanded beautifully as signatures are removed
   });
-
-  // Signatures on Page 3
-  section("Signature Verification / கையொப்பம் சரிபார்ப்பு");
-  ensureSpace(45);
-  addSignature(
-    "Customer Signature / வாடிக்கையாளர் கையொப்பம்",
-    client.customer_signature,
-    margin
-  );
-  addSignature(
-    "Artist Signature / கலைஞர் கையொப்பம்",
-    client.artist_signature,
-    pageWidth / 2 + 5
-  );
 
   // Start Aftercare Acknowledgment (Page 4)
   pdf.addPage();
