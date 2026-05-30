@@ -1344,12 +1344,45 @@ export default function AdminPage() {
                             onChange={(e) => {
                               const file = e.target.files?.[0];
                               if (file) {
+                                const maxSizeBytes = 10 * 1024 * 1024; // 10MB
+                                if (file.size > maxSizeBytes) {
+                                  alert("Photo size must be less than 10MB.");
+                                  return;
+                                }
+
                                 const reader = new FileReader();
-                                reader.onloadend = () => {
-                                  setSelectedClient({
-                                    ...selectedClient,
-                                    client_photo: reader.result as string
-                                  });
+                                reader.onload = (event) => {
+                                  const img = new window.Image();
+                                  img.src = event.target?.result as string;
+                                  img.onload = () => {
+                                    const canvas = document.createElement("canvas");
+                                    let width = img.width;
+                                    let height = img.height;
+
+                                    const maxDimension = 600;
+                                    if (width > maxDimension || height > maxDimension) {
+                                      if (width > height) {
+                                        height = Math.round((height * maxDimension) / width);
+                                        width = maxDimension;
+                                      } else {
+                                        width = Math.round((width * maxDimension) / height);
+                                        height = maxDimension;
+                                      }
+                                    }
+
+                                    canvas.width = width;
+                                    canvas.height = height;
+
+                                    const ctx = canvas.getContext("2d");
+                                    if (ctx) {
+                                      ctx.drawImage(img, 0, 0, width, height);
+                                      const compressedDataUrl = canvas.toDataURL("image/jpeg", 0.75);
+                                      setSelectedClient({
+                                        ...selectedClient,
+                                        client_photo: compressedDataUrl
+                                      });
+                                    }
+                                  };
                                 };
                                 reader.readAsDataURL(file);
                               }
