@@ -1104,13 +1104,14 @@ export default function AdminPage() {
                         }
                         onChange={(
                           value
-                        ) =>
+                        ) => {
+                          const calculatedAge = calculateAgeFromDob(value);
                           setSelectedClient({
                             ...selectedClient,
-                            dob:
-                              value,
-                          })
-                        }
+                            dob: value,
+                            age: calculatedAge,
+                          });
+                        }}
                       />
 
                       <AdminInput
@@ -1354,6 +1355,13 @@ export default function AdminPage() {
                                 reader.onload = (event) => {
                                   const img = new window.Image();
                                   img.src = event.target?.result as string;
+                                  img.onerror = () => {
+                                    alert("Invalid or corrupted image file. Please upload a valid photo.");
+                                    setSelectedClient({
+                                      ...selectedClient,
+                                      client_photo: ""
+                                    });
+                                  };
                                   img.onload = () => {
                                     const canvas = document.createElement("canvas");
                                     let width = img.width;
@@ -2207,6 +2215,22 @@ function AdminSelect({
     </div>
   );
 }
+
+const calculateAgeFromDob = (dobStr: string): string => {
+  if (!dobStr) return "";
+  try {
+    const birthDate = new Date(dobStr);
+    const today = new Date();
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const monthDiff = today.getMonth() - birthDate.getMonth();
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+      age--;
+    }
+    return String(age);
+  } catch {
+    return "";
+  }
+};
 
 const containsTamil = (str: string): boolean => {
   const tamilRange = /[\u0B80-\u0BFF]/;

@@ -16,6 +16,11 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Xtreme Tattoo Consent",
   description: "Digital consent form",
+  icons: {
+    icon: "/logo.jpg?v=2",
+    shortcut: "/logo.jpg?v=2",
+    apple: "/logo.jpg?v=2",
+  },
 };
 
 export const viewport: Viewport = {

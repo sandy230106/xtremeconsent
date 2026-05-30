@@ -167,6 +167,10 @@ export default function Home() {
       reader.onload = (event) => {
         const img = new window.Image();
         img.src = event.target?.result as string;
+        img.onerror = () => {
+          alert("Invalid or corrupted image file. Please upload a valid photo.");
+          setClientPhoto("");
+        };
         img.onload = () => {
           // Initialize canvas
           const canvas = document.createElement("canvas");
@@ -805,6 +809,11 @@ export default function Home() {
         "Please specify details for Yes answers.";
     }
 
+    if (!clientPhoto) {
+      errors.clientPhoto =
+        "Client photo is required.";
+    }
+
     if (!customerSignature) {
       errors.customer_signature =
         "Customer signature is required.";
@@ -1194,12 +1203,17 @@ export default function Home() {
       </div>
 
       {/* PHOTO UPLOAD */}
-      <div className="w-full max-w-[280px] lg:w-[280px] mx-auto lg:mx-0 flex-shrink-0 flex flex-col">
+      <div 
+        className="w-full max-w-[280px] lg:w-[280px] mx-auto lg:mx-0 flex-shrink-0 flex flex-col"
+        data-error-key="clientPhoto"
+      >
         <label className="block text-[#D4AF37] uppercase text-sm tracking-[2px] font-semibold mb-3">
           Client Photo
         </label>
         
-        <div className="relative aspect-[3/4] w-full rounded-2xl border border-[#D4AF37]/20 bg-black/50 overflow-hidden flex flex-col items-center justify-center p-3">
+        <div className={`relative aspect-[3/4] w-full rounded-2xl border bg-black/50 overflow-hidden flex flex-col items-center justify-center p-3 ${
+          validationErrors.clientPhoto ? "border-red-500" : "border-[#D4AF37]/20"
+        }`}>
           {clientPhoto ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
@@ -1238,6 +1252,12 @@ export default function Home() {
             >
               Remove Photo
             </button>
+          )}
+
+          {validationErrors.clientPhoto && (
+            <p className="mt-1 text-sm text-red-400 text-center">
+              {validationErrors.clientPhoto}
+            </p>
           )}
         </div>
       </div>
