@@ -61,6 +61,7 @@ type ClientData = {
 
   idProof: string;
 
+  idProofNo?: string;
 
   needleType?: string;
 
@@ -99,6 +100,98 @@ type TabType =
   | "clients"
   | "content"
   | "settings";
+
+function LoginGate({ children }: { children: React.ReactNode }) {
+  const [isLoggedIn, setIsLoggedIn] = useState<boolean | null>(null);
+  const [loginId, setLoginId] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    const auth = sessionStorage.getItem("xtreme_auth");
+    setIsLoggedIn(auth === "true");
+  }, []);
+
+  const handleLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (loginId === "xtreme" && password === "muthukumar.m") {
+      sessionStorage.setItem("xtreme_auth", "true");
+      setIsLoggedIn(true);
+      setError("");
+    } else {
+      setError("Invalid Login ID or Password");
+    }
+  };
+
+  if (isLoggedIn === null) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-black">
+        <p className="text-[#D4AF37] font-bold">Loading...</p>
+      </div>
+    );
+  }
+
+  if (!isLoggedIn) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-black px-4">
+        <form
+          onSubmit={handleLogin}
+          className="w-full max-w-md rounded-[32px] border border-[#D4AF37]/20 bg-[#111] p-8 sm:p-10 shadow-2xl"
+        >
+          <div className="text-center mb-8">
+            <h2 className="text-[36px] font-black uppercase text-[#D4AF37] tracking-[2px]">
+              XTREME
+            </h2>
+            <p className="text-neutral-400 text-sm mt-1">TATTOO STUDIO CONSENT GATE</p>
+          </div>
+
+          <div className="space-y-6">
+            <div>
+              <label className="block text-xs uppercase tracking-[2px] text-[#D4AF37] font-semibold mb-2">
+                Login ID
+              </label>
+              <input
+                type="text"
+                required
+                value={loginId}
+                onChange={(e) => setLoginId(e.target.value)}
+                className="w-full rounded-2xl border border-[#D4AF37]/10 bg-black/50 p-4 text-base text-white outline-none focus:border-[#D4AF37]/40"
+                placeholder="Enter Login ID"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs uppercase tracking-[2px] text-[#D4AF37] font-semibold mb-2">
+                Password
+              </label>
+              <input
+                type="password"
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full rounded-2xl border border-[#D4AF37]/10 bg-black/50 p-4 text-base text-white outline-none focus:border-[#D4AF37]/40"
+                placeholder="Enter Password"
+              />
+            </div>
+
+            {error && (
+              <p className="text-sm font-semibold text-red-400 text-center">{error}</p>
+            )}
+
+            <button
+              type="submit"
+              className="w-full rounded-full bg-[#D4AF37] py-4 font-black uppercase tracking-[2px] text-black transition hover:scale-105 cursor-pointer mt-2"
+            >
+              Sign In
+            </button>
+          </div>
+        </form>
+      </div>
+    );
+  }
+
+  return <>{children}</>;
+}
 
 /* =========================
    PAGE
@@ -319,7 +412,8 @@ export default function AdminPage() {
       [clients]
     );
   return (
-    <main className="flex min-h-screen flex-col bg-[#050505] text-white lg:flex-row">
+    <LoginGate>
+      <main className="flex min-h-screen flex-col bg-[#050505] text-white lg:flex-row">
 
       {/* SIDEBAR */}
       <aside className="w-full border-b border-[#D4AF37]/10 bg-[#0a0a0a] p-4 sm:p-6 lg:w-[290px] lg:border-b-0 lg:border-r">
@@ -808,7 +902,8 @@ export default function AdminPage() {
                           onClick={async () => {
                             try {
                               await downloadConsentPdf(
-                                client
+                                client,
+                                questions
                               );
                             } catch (error) {
                               console.error(
@@ -1139,6 +1234,22 @@ export default function AdminPage() {
                         }
                       />
 
+                      <AdminInput
+                        label="ID Proof Number"
+                        value={
+                          selectedClient.idProofNo || ""
+                        }
+                        onChange={(
+                          value
+                        ) =>
+                          setSelectedClient({
+                            ...selectedClient,
+                            idProofNo:
+                              value,
+                          })
+                        }
+                      />
+
                       <AdminSelect
                         label="Mode Of Payment"
                         value={
@@ -1181,6 +1292,25 @@ export default function AdminPage() {
                           })
                         }
                       />
+
+                      {selectedClient.service_type === "Tattoo" && (
+                        <AdminInput
+                          label="Type Of Needle Used"
+                          value={
+                            selectedClient.needleType ||
+                            ""
+                          }
+                          onChange={(
+                            value
+                          ) =>
+                            setSelectedClient({
+                              ...selectedClient,
+                              needleType:
+                                value,
+                            })
+                          }
+                        />
+                      )}
                     </div>
 
                     {/* EDIT CLIENT PHOTO */}
@@ -1400,29 +1530,30 @@ export default function AdminPage() {
                   <button
                     type="button"
                     onClick={async () => {
-
-                      await fetch(
-                        "/api/consent",
-                        {
-                          method:
-                            "PUT",
-                          headers:
-                            {
-                              "Content-Type":
-                                "application/json",
+                      try {
+                        const res = await fetch(
+                          "/api/consent",
+                          {
+                            method: "PUT",
+                            headers: {
+                              "Content-Type": "application/json",
                             },
-                          body:
-                            JSON.stringify(
-                              selectedClient
-                            ),
+                            body: JSON.stringify(selectedClient),
+                          }
+                        );
+
+                        if (res.ok) {
+                          alert("Client details updated successfully.");
+                          fetchClients();
+                          setEditing(false);
+                        } else {
+                          const errData = await res.json().catch(() => ({}));
+                          alert(`Failed to save changes: ${errData.error || errData.message || "Unknown error"}`);
                         }
-                      );
-
-                      fetchClients();
-
-                      setEditing(
-                        false
-                      );
+                      } catch (err: any) {
+                        console.error(err);
+                        alert(`Failed to save changes: ${err.message || "Network error"}`);
+                      }
                     }}
                     className="flex items-center gap-2 rounded-full bg-[#D4AF37] px-8 py-4 font-black uppercase text-black"
                   >
@@ -1794,6 +1925,11 @@ export default function AdminPage() {
                   />
 
                   <PdfField
+                    label="ID Proof Number"
+                    value={selectedClient.idProofNo}
+                  />
+
+                  <PdfField
                     label="Type Of Needle Used"
                     value={selectedClient.needleType}
                   />
@@ -1922,6 +2058,7 @@ export default function AdminPage() {
 
       </section>
     </main>
+    </LoginGate>
   );
 }
 
@@ -2038,6 +2175,21 @@ function AdminSelect({
   );
 }
 
+const fetchBase64Font = async (url: string): Promise<string> => {
+  const response = await fetch(url);
+  const blob = await response.blob();
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const base64data = reader.result as string;
+      const base64 = base64data.split(",")[1];
+      resolve(base64);
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+};
+
 const loadImage = (src: string): Promise<HTMLImageElement> => {
   return new Promise((resolve, reject) => {
     const img = new window.Image();
@@ -2049,7 +2201,8 @@ const loadImage = (src: string): Promise<HTMLImageElement> => {
 };
 
 async function downloadConsentPdf(
-  client: ClientData
+  client: ClientData,
+  questionsList: ConsentQuestion[] = []
 ) {
   const pdf = new jsPDF(
     "p",
@@ -2073,6 +2226,19 @@ async function downloadConsentPdf(
     console.error("Failed to load logo image:", e);
   }
 
+  // Load Tamil font dynamically
+  let hasTamilFont = false;
+  try {
+    const tamilFontBase64 = await fetchBase64Font(
+      "https://cdn.jsdelivr.net/gh/ajith/tamil-fonts@master/Lohit-Tamil.ttf"
+    );
+    pdf.addFileToVFS("Lohit-Tamil.ttf", tamilFontBase64);
+    pdf.addFont("Lohit-Tamil.ttf", "Lohit-Tamil", "normal");
+    hasTamilFont = true;
+  } catch (e) {
+    console.error("Failed to load Tamil font:", e);
+  }
+
   const startPage = () => {
     // Ensure a new page only if not the first page
     if (pdf.getNumberOfPages() > 1) pdf.addPage();
@@ -2082,20 +2248,9 @@ async function downloadConsentPdf(
     pdf.setTextColor(0, 0, 0);
     pdf.setFontSize(12);
   };
-// Replace consent page start with manual dark page setup
-const startConsentPage = () => {
-  pdf.addPage();
-  pdf.setFillColor(30, 30, 30);
-  pdf.rect(margin, margin, contentWidth, pageHeight - 2 * margin, "F");
-  pdf.setTextColor(255, 255, 255);
-  pdf.setFontSize(12);
-  y = margin;
-};
 
   // Initialize first page
   startPage();
-
-
 
   const ensureSpace = (
     height: number
@@ -2192,47 +2347,76 @@ const startConsentPage = () => {
       3;
   };
 
+  const questionTranslations: Record<string, string> = {
+    "Are you above 18 years old?": "உங்களுக்கு 18 வயதிற்கு மேல் உள்ளதா?",
+    "Are you pregnant or breastfeeding?": "நீங்கள் கர்ப்பமாக உள்ளீர்களா அல்லது குழந்தைக்கு பாலூட்டுகிறீர்களா?",
+    "Are you pregnant or breastfeeding": "நீங்கள் கர்ப்பமாக உள்ளீர்களா அல்லது குழந்தைக்கு பாலூட்டுகிறீர்களா?",
+    "Do you have diabetes?": "உங்களுக்கு நீரிழிவு நோய் உள்ளதா?",
+    "Do you have diabetes, blood pressure or medical conditions?": "உங்களுக்கு சக்கரை நோய், ரத்த அழுத்தம் அல்லது மருத்துவநிலைகள் உள்ளதா??",
+    "Do you have any skin disease, allergy, or infection?": "தோல் நோய், அலர்ஜி அல்லது தொற்று உள்ளதா?",
+    "Have you used alcohol, weed, or recreational drugs recently?": "நீங்கள் சமீபத்தில் மதுபானம், கஞ்சா அல்லது வேடிக்கை மருந்துகளை பயன்படுத்தியுள்ளீர்களா?",
+    "Have you eaten food today?": "இன்று உணவு சாப்பிட்டீர்களா?",
+    "Are you taking blood thinners?": "ரத்தத்தை நீர்த்தாக்கும் மருந்துகள் எடுத்துக்கொள்கிறீர்களா?",
+    "Are you taking any medications?": "நீங்கள் தற்போது மருந்துகள் எடுத்துக்கொள்கிறீர்களா?",
+    "Do you have epilepsy or seizures?": "உங்களுக்கு மயக்கம் அல்லது மிதக்கத் தாக்கங்கள் உள்ளதா?",
+    "Have you recently undergone cosmetic treatment?": "நீங்கள் சமீபத்தில் அழகுசார் சிகிச்சை பெற்றுள்ளீர்களா?",
+    "Do you have any medical condition we should know about?": "எங்களுக்கு தெரிய வேண்டிய உடல்நல பிரச்சனை ஏதேனும் உள்ளதா?",
+    "Is this your first tattoo?": "இது உங்கள் டாட்டூ ஆகுமா?",
+    "Is this your first PMU treatment?": "இது உங்கள் முதல் PMU treatment ஆகுமா?",
+    "Is this your first piercing?": "இது உங்கள் முதல் piercing ஆகுமா?",
+    "Is this your first tattoo removal session?": "இது உங்கள் முதல் டாட்டூ அகற்றும் session ஆகுமா?",
+  };
+
   const questionRow = (
     question: string,
     answer: string
   ) => {
-    const questionLines =
-      pdf.splitTextToSize(
-        question,
-        contentWidth - 28
-      ) as string[];
-    const height =
-      Math.max(
-        questionLines.length *
-          lineHeight,
-        lineHeight
-      ) + 6;
+    const questionFromState = questionsList.find(q => q.question_en === question);
+    const tamilText = questionTranslations[question] || questionFromState?.question_ta || "";
+
+    // Calculate height
+    const enLines = pdf.splitTextToSize(question, contentWidth - 28) as string[];
+    let taLines: string[] = [];
+    if (hasTamilFont && tamilText) {
+      pdf.setFont("Lohit-Tamil", "normal");
+      pdf.setFontSize(8.5);
+      taLines = pdf.splitTextToSize(`   ${tamilText}`, contentWidth - 32) as string[];
+    }
+    
+    const enHeight = enLines.length * 5;
+    const taHeight = taLines.length * 5;
+    const height = Math.max(enHeight + (taLines.length > 0 ? taHeight + 1.5 : 0) + 4, 12);
 
     ensureSpace(height);
-    // Question in dark charcoal
-    pdf.setFont("helvetica", "normal");
-    pdf.setFontSize(10);
+
+    // Draw English Question
+    pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(9.5);
     pdf.setTextColor(30, 30, 30);
-    pdf.text(
-      questionLines,
-      margin,
-      y
-    );
-    // Answer in bold black
+    pdf.text(enLines, margin, y);
+
+    // Draw Answer
     pdf.setFont("helvetica", "bold");
     pdf.setTextColor(0, 0, 0);
-    pdf.text(
-      answer || "--",
-      pageWidth - margin - 22,
-      y
-    );
+    pdf.text(answer || "--", pageWidth - margin - 22, y);
+
+    y += enHeight + 1;
+
+    // Draw Tamil Question
+    if (hasTamilFont && taLines.length > 0) {
+      pdf.setFont("Lohit-Tamil", "normal");
+      pdf.setFontSize(8);
+      pdf.setTextColor(100, 100, 100);
+      pdf.text(taLines, margin + 2, y);
+      y += taHeight;
+    }
 
     // Subtle line divider
     pdf.setDrawColor(230, 230, 230);
     pdf.setLineWidth(0.15);
-    pdf.line(margin, y + height - 3, pageWidth - margin, y + height - 3);
+    pdf.line(margin, y + 2, pageWidth - margin, y + 2);
 
-    y += height;
+    y += 5;
   };
 
   const addSignature = (
@@ -2347,7 +2531,6 @@ const startConsentPage = () => {
   const metadataStart = y;
 
   // Draw Client Photo on the right side
-  // Position: x = 151, y = metadataStart, width = 45, height = 55
   pdf.rect(151, metadataStart, 45, 55);
   if (client.client_photo) {
     try {
@@ -2450,6 +2633,10 @@ const startConsentPage = () => {
     "ID Proof",
     client.idProof
   );
+  field(
+    "ID Proof Number",
+    client.idProofNo
+  );
 
   if (client.needleType) {
     field(
@@ -2485,7 +2672,7 @@ const startConsentPage = () => {
   }
 
   field(
-          "If yes, specify",
+    "If yes, specify",
     client.notes
   );
 
@@ -2500,41 +2687,125 @@ const startConsentPage = () => {
   pdf.setFontSize(12);
   section("Consent & Acknowledgment");
 
-  [
-    "I voluntarily consent to receive the selected procedure at XTREME TATTOO STUDIO.",
-    "I understand the procedure, results, healing, and risks may vary from person to person.",
-    "I confirm that I have disclosed all medical conditions truthfully.",
-    "I understand failure to follow aftercare instructions may affect healing and final results.",
-    "I consent to studio photos for records and promotional purposes.",
-    "I confirm I am not under the influence of alcohol or drugs during this procedure.",
-    "I confirm I have read and understood this consent form fully.",
-  ].forEach(
-    (item, index) => {
-      const lines =
-        pdf.splitTextToSize(
-          `${index + 1}. ${item}`,
-          contentWidth
-        ) as string[];
+  const dynamicContent = {
+    Tattoo: {
+      procedure: "tattoo procedure",
+      tamilProcedure: "டாட்டூ செயல்",
+      type: "permanent body art",
+      tamilType: "நிரந்தர உடல் கலை",
+      risks: "skin irritation, redness, swelling, infection, allergic reaction or dissatisfaction",
+      tamilRisks: "தோல் எரிச்சல், சிவப்பு, வீக்கம், infection, allergy அல்லது திருப்தியின்மை",
+    },
+    PMU: {
+      procedure: "PMU treatment",
+      tamilProcedure: "PMU சிகிச்சை",
+      type: "semi-permanent cosmetic procedure",
+      tamilType: "அரைய்நிரந்தர அழகு சிகிச்சை",
+      risks: "redness, swelling, fading, irritation or dissatisfaction",
+      tamilRisks: "சிவப்பு, வீக்கம், fading, irritation அல்லது திருப்தியின்மை",
+    },
+    Piercing: {
+      procedure: "piercing procedure",
+      tamilProcedure: "piercing செயல்",
+      type: "body piercing treatment",
+      tamilType: "உடல் piercing சிகிச்சை",
+      risks: "pain, irritation, infection or swelling",
+      tamilRisks: "வலி, irritation, infection அல்லது வீக்கம்",
+    },
+    "Tattoo Removal": {
+      procedure: "tattoo removal procedure",
+      tamilProcedure: "டாட்டூ அகற்றும் செயல்",
+      type: "tattoo fading/removal process",
+      tamilType: "டாட்டூ அகற்றும் செயல்முறை",
+      risks: "redness, blistering, discomfort or multiple sessions",
+      tamilRisks: "சிவப்பு, blistering, discomfort அல்லது பல sessions",
+    },
+  };
 
-      ensureSpace(
-        lines.length * lineHeight +
-          2
-      );
-      pdf.setFont(
-        "helvetica",
-        "normal"
-      );
-      pdf.setFontSize(10);
-      pdf.text(
-        lines,
-        margin,
-        y
-      );
-      y +=
-        lines.length * lineHeight +
-        2;
+  const sType = client.service_type || "Tattoo";
+  const contentVars = dynamicContent[sType] || dynamicContent["Tattoo"];
+
+  const consentStatements = [
+    {
+      en: `I voluntarily consent to receive ${contentVars.procedure} at XTREME TATTOO STUDIO.`,
+      ta: `XTREME TATTOO STUDIO-ல் ${contentVars.tamilProcedure} பெற நான் என் சொந்த விருப்பத்துடன் ஒப்புதல் அளிக்கிறேன்.`
+    },
+    {
+      en: `I understand this is a ${contentVars.type} and results may vary from person to person.`,
+      ta: `இது ஒரு ${contentVars.tamilType} என்பதை நான் புரிந்துகொள்கிறேன். முடிவுகள் ஒவ்வொருவருக்கும் மாறுபடலாம்.`
+    },
+    {
+      en: `I understand risks may include ${contentVars.risks}.`,
+      ta: `இதனால் ${contentVars.tamilRisks} போன்ற பிரச்சனைகள் ஏற்படலாம் என்பதை நான் புரிந்துகொள்கிறேன்.`
+    },
+    {
+      en: "I confirm that I have disclosed all medical conditions truthfully.",
+      ta: "எனது அனைத்து உடல்நல தகவல்களையும் உண்மையாக வழங்கியுள்ளேன்."
+    },
+    {
+      en: "I understand failure to follow aftercare instructions may affect healing and final results.",
+      ta: "Aftercare வழிமுறைகளை பின்பற்றவில்லை என்றால் healing மற்றும் இறுதி முடிவுகள் பாதிக்கப்படலாம்."
+    },
+    {
+      en: "I consent to studio photos for records and promotional purposes.",
+      ta: "Studio records மற்றும் promotion நோக்கத்திற்காக புகைப்படம் எடுக்க அனுமதி அளிக்கிறேன்."
+    },
+    {
+      en: "I release XTREME TATTOO STUDIO, artists and employees from expected legal liabilities related to healing results.",
+      ta: "Healing முடிவுகள் தொடர்பான சட்ட பொறுப்புகளில் இருந்து XTREME TATTOO STUDIO மற்றும் artists-ஐ விடுவிக்கிறேன்."
+    },
+    {
+      en: "I confirm I am not under the influence of alcohol or drugs during this procedure.",
+      ta: "இந்த procedure நேரத்தில் alcohol அல்லது drugs தாக்கத்தில் இல்லை என்பதை உறுதிப்படுத்துகிறேன்."
+    },
+    {
+      en: "I confirm I have read and understood this consent form fully.",
+      ta: "இந்த consent form-ஐ முழுமையாக படித்து புரிந்துகொண்டேன் என்பதை உறுதிப்படுத்துகிறேன்."
     }
-  );
+  ];
+
+  consentStatements.forEach((item, index) => {
+    // English part
+    pdf.setFont("helvetica", "normal");
+    pdf.setFontSize(9.5);
+    pdf.setTextColor(26, 26, 26);
+    
+    const enText = `${index + 1}. ${item.en}`;
+    const enLines = pdf.splitTextToSize(enText, contentWidth) as string[];
+    
+    // Tamil part
+    const taText = `    ${item.ta}`;
+    let taLines: string[] = [];
+    if (hasTamilFont) {
+      pdf.setFont("Lohit-Tamil", "normal");
+      pdf.setFontSize(8.5);
+      taLines = pdf.splitTextToSize(taText, contentWidth - 4) as string[];
+    }
+
+    const enHeight = enLines.length * 5;
+    const taHeight = taLines.length * 5;
+    const totalHeight = enHeight + (taLines.length > 0 ? taHeight + 2 : 0) + 4;
+
+    ensureSpace(totalHeight);
+
+    // Draw English
+    pdf.setFont("helvetica", "normal");
+    pdf.setFontSize(9.5);
+    pdf.setTextColor(26, 26, 26);
+    pdf.text(enLines, margin, y);
+    y += enHeight + 1.5;
+
+    // Draw Tamil
+    if (hasTamilFont && taLines.length > 0) {
+      pdf.setFont("Lohit-Tamil", "normal");
+      pdf.setFontSize(8.5);
+      pdf.setTextColor(80, 80, 80); // Subtle charcoal for translation
+      pdf.text(taLines, margin + 2, y);
+      y += taHeight;
+    }
+
+    y += 3; // Space between items
+  });
 
   section("Signatures");
   ensureSpace(45);

@@ -18,6 +18,27 @@ You will need to create two tables in the AWS DynamoDB Console (under your prefe
    - **Table Name:** `consent_forms`
    - **Partition Key:** `id` (Type: **String**)
    - **Sort Key:** None
+   - **Fields / Attributes Saved:**
+     - `id` (String) - Unique identifier
+     - `form_no` (String) - Consent Form Number (e.g., `XT-TAT-001`)
+     - `name` (String) - Client's full name
+     - `dob` (String) - Date of birth
+     - `age` (String) - Client's age
+     - `gender` (String) - Gender
+     - `occupation` (String) - Occupation
+     - `phone` (String) - 10-digit phone number
+     - `address` (String) - Address
+     - `idProof` (String) - Type of ID proof provided (e.g., `Aadhaar Card`)
+     - `idProofNo` (String) - ID proof document number
+     - `needleType` (String, Optional) - Type of needle used (Tattoo only)
+     - `payment_mode` (String) - Mode of payment (`Cash`, `GPay`, `Card`)
+     - `price` (String) - Price charged
+     - `questionnaire` (Map/Record) - Health declaration answers
+     - `notes` (String) - Additional medical notes
+     - `customer_signature` (String) - Base64 encoded customer signature
+     - `artist_signature` (String) - Base64 encoded artist signature
+     - `client_photo` (String) - Base64 compressed client photo (compressed to 30KB - 80KB)
+     - `created_at` (String) - Creation timestamp
    - Leave other settings as default (or choose **On-Demand** capacity to stay cost-efficient).
 
 2. **`consent_questions` Table**

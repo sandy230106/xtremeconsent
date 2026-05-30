@@ -36,6 +36,98 @@ type PMUService =
 type ValidationErrors =
   Record<string, string>;
 
+function LoginGate({ children }: { children: React.ReactNode }) {
+  const [isLoggedIn, setIsLoggedIn] = useState<boolean | null>(null);
+  const [loginId, setLoginId] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    const auth = sessionStorage.getItem("xtreme_auth");
+    setIsLoggedIn(auth === "true");
+  }, []);
+
+  const handleLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (loginId === "xtreme" && password === "muthukumar.m") {
+      sessionStorage.setItem("xtreme_auth", "true");
+      setIsLoggedIn(true);
+      setError("");
+    } else {
+      setError("Invalid Login ID or Password");
+    }
+  };
+
+  if (isLoggedIn === null) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-black">
+        <p className="text-[#D4AF37] font-bold">Loading...</p>
+      </div>
+    );
+  }
+
+  if (!isLoggedIn) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-black px-4">
+        <form
+          onSubmit={handleLogin}
+          className="w-full max-w-md rounded-[32px] border border-[#D4AF37]/20 bg-[#111] p-8 sm:p-10 shadow-2xl"
+        >
+          <div className="text-center mb-8">
+            <h2 className="text-[36px] font-black uppercase text-[#D4AF37] tracking-[2px]">
+              XTREME
+            </h2>
+            <p className="text-neutral-400 text-sm mt-1">TATTOO STUDIO CONSENT GATE</p>
+          </div>
+
+          <div className="space-y-6">
+            <div>
+              <label className="block text-xs uppercase tracking-[2px] text-[#D4AF37] font-semibold mb-2">
+                Login ID
+              </label>
+              <input
+                type="text"
+                required
+                value={loginId}
+                onChange={(e) => setLoginId(e.target.value)}
+                className="w-full rounded-2xl border border-[#D4AF37]/10 bg-black/50 p-4 text-base text-white outline-none focus:border-[#D4AF37]/40"
+                placeholder="Enter Login ID"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs uppercase tracking-[2px] text-[#D4AF37] font-semibold mb-2">
+                Password
+              </label>
+              <input
+                type="password"
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full rounded-2xl border border-[#D4AF37]/10 bg-black/50 p-4 text-base text-white outline-none focus:border-[#D4AF37]/40"
+                placeholder="Enter Password"
+              />
+            </div>
+
+            {error && (
+              <p className="text-sm font-semibold text-red-400 text-center">{error}</p>
+            )}
+
+            <button
+              type="submit"
+              className="w-full rounded-full bg-[#D4AF37] py-4 font-black uppercase tracking-[2px] text-black transition hover:scale-105 cursor-pointer mt-2"
+            >
+              Sign In
+            </button>
+          </div>
+        </form>
+      </div>
+    );
+  }
+
+  return <>{children}</>;
+}
+
 export default function Home() {
   /* SIGNATURES */
   const signatureModalRef =
@@ -60,82 +152,50 @@ export default function Home() {
 
   /* CAMERA & CLIENT PHOTO */
   const [clientPhoto, setClientPhoto] = useState("");
-  const [cameraActive, setCameraActive] = useState(false);
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const streamRef = useRef<MediaStream | null>(null);
-
-  const startCamera = async () => {
-    try {
-      setCameraActive(true);
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 } },
-        audio: false,
-      });
-      streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-      }
-    } catch (err) {
-      console.error("Camera access error:", err);
-      alert("Could not access camera. Please upload a photo instead.");
-      setCameraActive(false);
-    }
-  };
-
-  const stopCamera = () => {
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach((track) => track.stop());
-      streamRef.current = null;
-    }
-    setCameraActive(false);
-  };
-
-  const capturePhoto = () => {
-    if (videoRef.current) {
-      const video = videoRef.current;
-      const canvas = document.createElement("canvas");
-      const videoWidth = video.videoWidth;
-      const videoHeight = video.videoHeight;
-      
-      let cropWidth = videoWidth;
-      let cropHeight = (videoWidth * 4) / 3;
-      
-      if (cropHeight > videoHeight) {
-        cropHeight = videoHeight;
-        cropWidth = (videoHeight * 3) / 4;
-      }
-      
-      const startX = (videoWidth - cropWidth) / 2;
-      const startY = (videoHeight - cropHeight) / 2;
-
-      canvas.width = 300;
-      canvas.height = 400;
-      const ctx = canvas.getContext("2d");
-      if (ctx) {
-        ctx.drawImage(
-          video,
-          startX,
-          startY,
-          cropWidth,
-          cropHeight,
-          0,
-          0,
-          canvas.width,
-          canvas.height
-        );
-        const dataUrl = canvas.toDataURL("image/jpeg", 0.85);
-        setClientPhoto(dataUrl);
-      }
-      stopCamera();
-    }
-  };
 
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      // Validate file size is under 10MB
+      const maxSizeBytes = 10 * 1024 * 1024; // 10MB
+      if (file.size > maxSizeBytes) {
+        alert("Photo size must be less than 10MB.");
+        return;
+      }
+
       const reader = new FileReader();
-      reader.onloadend = () => {
-        setClientPhoto(reader.result as string);
+      reader.onload = (event) => {
+        const img = new window.Image();
+        img.src = event.target?.result as string;
+        img.onload = () => {
+          // Initialize canvas
+          const canvas = document.createElement("canvas");
+          let width = img.width;
+          let height = img.height;
+
+          // Resize so that max dimension is 600px
+          const maxDimension = 600;
+          if (width > maxDimension || height > maxDimension) {
+            if (width > height) {
+              height = Math.round((height * maxDimension) / width);
+              width = maxDimension;
+            } else {
+              width = Math.round((width * maxDimension) / height);
+              height = maxDimension;
+            }
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+
+          const ctx = canvas.getContext("2d");
+          if (ctx) {
+            ctx.drawImage(img, 0, 0, width, height);
+            // Compress to JPEG with 0.75 quality (results in standard 30KB - 80KB crisp photo)
+            const compressedDataUrl = canvas.toDataURL("image/jpeg", 0.75);
+            setClientPhoto(compressedDataUrl);
+          }
+        };
       };
       reader.readAsDataURL(file);
     }
@@ -174,6 +234,7 @@ export default function Home() {
       phone: "",
       address: "",
       idProof: "",
+      idProofNo: "",
       needleType: "",
       payment_mode: "",
       price: "",
@@ -276,14 +337,7 @@ export default function Home() {
     getFormNo();
   }, [service]);
 
-  /* CLEANUP CAMERA ON UNMOUNT */
-  useEffect(() => {
-    return () => {
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach((track) => track.stop());
-      }
-    };
-  }, []);
+
 
   /* INPUT CHANGE */
   const handleChange = (
@@ -679,6 +733,11 @@ export default function Home() {
         "ID proof is required.";
     }
 
+    if (!formData.idProofNo.trim()) {
+      errors.idProofNo =
+        "ID proof number is required.";
+    }
+
     if (!formData.payment_mode) {
       errors.payment_mode =
         "Payment mode is required.";
@@ -848,7 +907,8 @@ export default function Home() {
   };
 
   return (
-    <main className="min-h-screen bg-black text-white overflow-x-hidden">
+    <LoginGate>
+      <main className="min-h-screen bg-black text-white overflow-x-hidden">
 
       {/* BACKGROUND */}
       <div className="fixed inset-0 bg-[radial-gradient(circle_at_center,_rgba(212,175,55,0.08)_0%,_black_70%)]" />
@@ -1133,87 +1193,51 @@ export default function Home() {
         />
       </div>
 
-      {/* CAMERA CAPTURE */}
+      {/* PHOTO UPLOAD */}
       <div className="w-full max-w-[280px] lg:w-[280px] mx-auto lg:mx-0 flex-shrink-0 flex flex-col">
         <label className="block text-[#D4AF37] uppercase text-sm tracking-[2px] font-semibold mb-3">
           Client Photo
         </label>
         
         <div className="relative aspect-[3/4] w-full rounded-2xl border border-[#D4AF37]/20 bg-black/50 overflow-hidden flex flex-col items-center justify-center p-3">
-          {cameraActive ? (
-            <video
-              ref={videoRef}
-              autoPlay
-              playsInline
-              className="absolute inset-0 w-full h-full object-cover"
-            />
-          ) : clientPhoto ? (
+          {clientPhoto ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
               src={clientPhoto}
-              alt="Captured client"
+              alt="Uploaded client"
               className="absolute inset-0 w-full h-full object-cover"
             />
           ) : (
             <div className="text-center p-4">
               <div className="mx-auto w-12 h-12 rounded-full bg-[#D4AF37]/10 flex items-center justify-center mb-3">
-                <Camera className="text-[#D4AF37]" size={24} />
+                <Upload className="text-[#D4AF37]" size={24} />
               </div>
-              <p className="text-sm font-semibold text-neutral-400">Live Client Photo</p>
-              <p className="text-xs text-neutral-500 mt-1">Take a live photo or upload</p>
+              <p className="text-sm font-semibold text-neutral-400">Client Photo</p>
+              <p className="text-xs text-neutral-500 mt-1">Upload a photo (Max 10MB)</p>
             </div>
           )}
         </div>
         
         <div className="mt-4 flex flex-col gap-2">
-          {cameraActive ? (
-            <>
-              <button
-                type="button"
-                onClick={capturePhoto}
-                className="w-full rounded-2xl bg-[#D4AF37] py-3.5 text-sm font-black uppercase tracking-[1px] text-black transition hover:scale-[1.02] cursor-pointer"
-              >
-                Capture Photo
-              </button>
-              <button
-                type="button"
-                onClick={stopCamera}
-                className="w-full rounded-2xl border border-red-500/20 bg-red-500/10 py-3.5 text-sm font-semibold text-red-400 transition hover:bg-red-500/20 cursor-pointer"
-              >
-                Cancel
-              </button>
-            </>
-          ) : (
-            <>
-              <button
-                type="button"
-                onClick={startCamera}
-                className="w-full rounded-2xl border border-[#D4AF37]/30 bg-[#D4AF37]/10 py-3.5 text-sm font-semibold text-[#D4AF37] transition hover:bg-[#D4AF37]/20 cursor-pointer"
-              >
-                {clientPhoto ? "Retake Photo" : "Take Live Photo"}
-              </button>
-              
-              <label className="w-full rounded-2xl border border-[#D4AF37]/10 bg-[#131313] hover:bg-[#181818] py-3.5 text-sm font-semibold text-neutral-300 text-center cursor-pointer hover:border-[#D4AF37]/30 transition flex items-center justify-center gap-2">
-                <Upload size={16} />
-                <span>Upload Photo</span>
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handlePhotoUpload}
-                  className="hidden"
-                />
-              </label>
-              
-              {clientPhoto && (
-                <button
-                  type="button"
-                  onClick={() => setClientPhoto("")}
-                  className="w-full py-2 text-xs font-semibold text-red-400 underline cursor-pointer"
-                >
-                  Remove Photo
-                </button>
-              )}
-            </>
+          <label className="w-full rounded-2xl border border-[#D4AF37]/30 bg-[#D4AF37]/10 hover:bg-[#D4AF37]/20 py-3.5 text-sm font-semibold text-[#D4AF37] text-center cursor-pointer transition flex items-center justify-center gap-2">
+            <Upload size={16} />
+            <span>{clientPhoto ? "Change Photo" : "Upload Photo"}</span>
+            <input
+              type="file"
+              accept="image/*"
+              onChange={handlePhotoUpload}
+              className="hidden"
+            />
+          </label>
+          
+          {clientPhoto && (
+            <button
+              type="button"
+              onClick={() => setClientPhoto("")}
+              className="w-full py-2 text-xs font-semibold text-red-400 underline cursor-pointer"
+            >
+              Remove Photo
+            </button>
           )}
         </div>
       </div>
@@ -1258,9 +1282,8 @@ export default function Home() {
       )}
     </div>
 
-    {/* ID PROOF */}
+    {/* ID PROOF & PAYMENT */}
     <div className="mt-5 grid gap-5 md:grid-cols-2">
-
       <SelectField
         label="ID Proof"
         name="idProof"
@@ -1281,6 +1304,21 @@ export default function Home() {
           "PAN Card",
           "Voter ID",
         ]}
+      />
+
+      <InputField
+        label="ID Proof Number"
+        name="idProofNo"
+        value={
+          formData.idProofNo
+        }
+        onChange={
+          handleChange
+        }
+        error={
+          validationErrors.idProofNo
+        }
+        required
       />
 
       <SelectField
@@ -2048,6 +2086,7 @@ export default function Home() {
 )}
  
 </main>
+</LoginGate>
 );
 }
 
