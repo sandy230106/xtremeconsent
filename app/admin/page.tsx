@@ -2417,16 +2417,15 @@ async function downloadConsentPdf(
   const section = (
     title: string
   ) => {
-    ensureSpace(18);
+    ensureSpace(20);
     y += 2;
     pdf.setFillColor(26, 26, 26);
-    pdf.rect(margin, y, contentWidth, 8, "F");
+    pdf.rect(margin, y, contentWidth, 9, "F");
     
-    pdf.setTextColor(212, 175, 55); // Premium Gold
-    safeText(String(title || "").toUpperCase(), margin + 3, y + 5.5, 9.5, "bold");
+    safeText(String(title || "").toUpperCase(), margin + 3, y + 6.2, 11, "bold", "#D4AF37");
     
     pdf.setTextColor(0, 0, 0);
-    y += 12;
+    y += 13;
   };
 
   const field = (
@@ -2436,15 +2435,13 @@ async function downloadConsentPdf(
   ) => {
     const displayValue = String(value || "--");
     const lines = safeSplitText(displayValue, width);
-    const height = 9 + lines.length * lineHeight;
+    const height = 10 + lines.length * lineHeight;
 
     ensureSpace(height);
-    pdf.setTextColor(50, 50, 50);
-    safeText(String(label || "").toUpperCase(), margin, y, 9, "bold");
+    safeText(String(label || "").toUpperCase(), margin, y, 10, "bold", "#333333");
     
-    pdf.setTextColor(0, 0, 0);
-    y += 5;
-    safeText(lines, margin, y, 10, "normal");
+    y += 5.5;
+    safeText(lines, margin, y, 11, "bold", "#000000");
     y += lines.length * lineHeight + 3;
   };
 
@@ -2868,15 +2865,9 @@ async function downloadConsentPdf(
     client.notes
   );
 
-  // Start Consent & Acknowledgment page with dark background
-  startPage();
-  // White background (no dark fill)
-  pdf.setFillColor(255, 255, 255);
-  pdf.rect(margin, margin, contentWidth, pageHeight - 2 * margin, "F");
-  // Dark text on white background
-  pdf.setTextColor(0, 0, 0);
-  // Larger font for readability
-  pdf.setFontSize(12);
+  // Start Consent & Acknowledgment (Page 3)
+  pdf.addPage();
+  y = margin;
   section("Consent & Acknowledgment / ஒப்புதல் மற்றும் அங்கீகாரம்");
 
   const dynamicContent = {
@@ -2964,24 +2955,43 @@ async function downloadConsentPdf(
       taLines = [item.ta];
     }
 
-    const enHeight = enLines.length * 5;
-    const taHeight = taLines.length * 5;
+    const enHeight = enLines.length * 5.5;
+    const taHeight = taLines.length * 5.5;
     const totalHeight = enHeight + (taLines.length > 0 ? taHeight + 2 : 0) + 4;
 
     ensureSpace(totalHeight);
 
-    // Draw English
-    safeText(enLines, margin, y, 9.5, "normal", "#111111");
+    // Draw English: bold, 10.5pt, pure black
+    safeText(enLines, margin, y, 10.5, "bold", "#000000");
     y += enHeight + 1.5;
 
-    // Draw Tamil
+    // Draw Tamil: bold, 10pt, dark charcoal
     if (taLines.length > 0) {
-      safeText(taLines, margin + 4, y, 8.5, "bold", "#333333");
+      safeText(taLines, margin + 4, y, 10, "bold", "#222222");
       y += taHeight;
     }
 
-    y += 3; // Space between items
+    y += 4; // Space between items
   });
+
+  // Signatures on Page 3
+  section("Signature Verification / கையொப்பம் சரிபார்ப்பு");
+  ensureSpace(45);
+  addSignature(
+    "Customer Signature / வாடிக்கையாளர் கையொப்பம்",
+    client.customer_signature,
+    margin
+  );
+  addSignature(
+    "Artist Signature / கலைஞர் கையொப்பம்",
+    client.artist_signature,
+    pageWidth / 2 + 5
+  );
+
+  // Start Aftercare Acknowledgment (Page 4)
+  pdf.addPage();
+  y = margin;
+  section("Aftercare Acknowledgment / பிந்தைய பராமரிப்பு ஒப்புதல்");
 
   const dynamicAftercare = {
     Tattoo: "Follow all tattoo aftercare instructions provided by your tattoo artist.",
@@ -3020,8 +3030,6 @@ async function downloadConsentPdf(
     }
   ];
 
-  section("Aftercare Acknowledgment / பிந்தைய பராமரிப்பு ஒப்புதல்");
-
   aftercareStatements.forEach((item, index) => {
     const enText = `${index + 1}. ${item.en}`;
     const enLines = safeSplitText(enText, contentWidth);
@@ -3031,26 +3039,27 @@ async function downloadConsentPdf(
       taLines = [item.ta];
     }
 
-    const enHeight = enLines.length * 5;
-    const taHeight = taLines.length * 5;
+    const enHeight = enLines.length * 5.5;
+    const taHeight = taLines.length * 5.5;
     const totalHeight = enHeight + (taLines.length > 0 ? taHeight + 2 : 0) + 4;
 
     ensureSpace(totalHeight);
 
-    // Draw English
-    safeText(enLines, margin, y, 9.5, "normal", "#111111");
+    // Draw English: bold, 10.5pt, pure black
+    safeText(enLines, margin, y, 10.5, "bold", "#000000");
     y += enHeight + 1.5;
 
-    // Draw Tamil
+    // Draw Tamil: bold, 10pt, dark charcoal
     if (taLines.length > 0) {
-      safeText(taLines, margin + 4, y, 8.5, "bold", "#333333");
+      safeText(taLines, margin + 4, y, 10, "bold", "#222222");
       y += taHeight;
     }
 
-    y += 3; // Space between items
+    y += 4; // Space between items
   });
 
-  section("Signatures / கையொப்பங்கள்");
+  // Signatures on Page 4
+  section("Signature Verification / கையொப்பம் சரிபார்ப்பு");
   ensureSpace(45);
   addSignature(
     "Customer Signature / வாடிக்கையாளர் கையொப்பம்",
@@ -3062,6 +3071,7 @@ async function downloadConsentPdf(
     client.artist_signature,
     pageWidth / 2 + 5
   );
+
   y += 42;
 
   const fileName =
