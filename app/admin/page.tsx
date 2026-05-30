@@ -2263,9 +2263,7 @@ async function downloadConsentPdf(
   // Load Tamil font dynamically
   let hasTamilFont = false;
   try {
-    const tamilFontBase64 = await fetchBase64Font(
-      "https://cdn.jsdelivr.net/gh/ajith/tamil-fonts@master/Lohit-Tamil.ttf"
-    );
+    const tamilFontBase64 = await fetchBase64Font("/Lohit-Tamil.ttf");
     pdf.addFileToVFS("Lohit-Tamil.ttf", tamilFontBase64);
     pdf.addFont("Lohit-Tamil.ttf", "Lohit-Tamil", "normal");
     hasTamilFont = true;
@@ -2347,14 +2345,8 @@ async function downloadConsentPdf(
     pdf.setFillColor(26, 26, 26);
     pdf.rect(margin, y, contentWidth, 8, "F");
     
-    setPdfFont("helvetica", "bold");
-    pdf.setFontSize(10);
     pdf.setTextColor(212, 175, 55); // Premium Gold
-    try {
-      pdf.text(String(title || "").toUpperCase(), margin + 3, y + 5.5);
-    } catch {
-      // fallback
-    }
+    safeText(String(title || "").toUpperCase(), margin + 3, y + 5.5, 9.5, "bold");
     
     pdf.setTextColor(0, 0, 0);
     y += 12;
@@ -2399,6 +2391,32 @@ async function downloadConsentPdf(
     "Is this your first tattoo removal session?": "இது உங்கள் முதல் டாட்டூ அகற்றும் session ஆகுமா?",
   };
 
+  const translateAnswer = (ans: string) => {
+    if (!ans) return "--";
+    const upper = ans.trim().toUpperCase();
+    if (upper === "YES") return "Yes / ஆம்";
+    if (upper === "NO") return "No / இல்லை";
+    return ans;
+  };
+
+  const translateGender = (g?: string) => {
+    if (!g) return "--";
+    const upper = g.trim().toUpperCase();
+    if (upper === "MALE") return "Male / ஆண்";
+    if (upper === "FEMALE") return "Female / பெண்";
+    if (upper === "OTHER") return "Other / மற்றவை";
+    return g;
+  };
+
+  const translatePaymentMode = (pm?: string) => {
+    if (!pm) return "--";
+    const upper = pm.trim().toUpperCase();
+    if (upper === "CASH") return "Cash / ரொக்கம்";
+    if (upper === "GPAY") return "GPay / கூகுள் பே";
+    if (upper === "CARD") return "Card / அட்டை";
+    return pm;
+  };
+
   const questionRow = (
     question: string,
     answer: string
@@ -2419,7 +2437,7 @@ async function downloadConsentPdf(
     ensureSpace(height);
 
     safeText(enLines, margin, y, 9.5, "bold");
-    safeText(answer || "--", pageWidth - margin - 22, y, 9.5, "bold");
+    safeText(translateAnswer(answer), pageWidth - margin - 25, y, 9.5, "bold");
 
     y += enHeight + 1;
 
@@ -2447,16 +2465,7 @@ async function downloadConsentPdf(
     signature: string | undefined,
     x: number
   ) => {
-    pdf.setFont(
-      "helvetica",
-      "bold"
-    );
-    pdf.setFontSize(9);
-    pdf.text(
-      label,
-      x,
-      y
-    );
+    safeText(label, x, y, 9, "bold");
     pdf.rect(
       x,
       y + 4,
@@ -2582,12 +2591,12 @@ async function downloadConsentPdf(
 
   // Draw metadata fields on the left side
   field(
-    "Consent No",
+    "Consent No / ஒப்புதல் எண்",
     client.form_no,
     120
   );
   field(
-    "Date",
+    "Date / தேதி",
     client.consent_date
       ? formatDate(client.consent_date)
       : client.created_at
@@ -2596,17 +2605,17 @@ async function downloadConsentPdf(
     120
   );
   field(
-    "Service",
+    "Service / சேவை",
     client.service_type,
     120
   );
   field(
-    "Payment Mode",
-    client.payment_mode,
+    "Payment Mode / கட்டண முறை",
+    translatePaymentMode(client.payment_mode),
     120
   );
   field(
-    "Price",
+    "Price / விலை",
     client.price
       ? `Rs. ${client.price}`
       : "",
@@ -2615,7 +2624,7 @@ async function downloadConsentPdf(
 
   if (client.service_type === "PMU") {
     field(
-      "PMU Service",
+      "PMU Service / PMU சேவை",
       client.pmu_service,
       120
     );
@@ -2625,48 +2634,48 @@ async function downloadConsentPdf(
   y = Math.max(y, metadataStart + 55 + 4);
 
   section(
-    "Client Details"
+    "Client Details / வாடிக்கையாளர் விவரங்கள்"
   );
   field(
-    "Client Name",
+    "Client Name / பெயர்",
     client.name
   );
   field(
-    "Phone Number",
+    "Phone Number / தொலைபேசி எண்",
     client.phone
   );
   field(
-    "Date Of Birth",
+    "Date Of Birth / பிறந்த தேதி",
     client.dob
   );
   field(
-    "Age",
+    "Age / வயது",
     client.age
   );
   field(
-    "Gender",
-    client.gender
+    "Gender / பாலினம்",
+    translateGender(client.gender)
   );
   field(
-    "Occupation",
+    "Occupation / தொழில்",
     client.occupation
   );
   field(
-    "Address",
+    "Address / முகவரி",
     client.address
   );
   field(
-    "ID Proof",
+    "ID Proof / அடையாள சான்று",
     client.idProof
   );
   field(
-    "ID Proof Number",
+    "ID Proof Number / அடையாள சான்று எண்",
     client.idProofNo
   );
 
   if (client.needleType) {
     field(
-      "Type Of Needle Used",
+      "Type Of Needle Used / பயன்படுத்தப்பட்ட ஊசியின் வகை",
       client.needleType
     );
   }
@@ -2674,7 +2683,7 @@ async function downloadConsentPdf(
   pdf.addPage();
   y = margin;
   section(
-    "Health Declaration"
+    "Health Declaration / உடல்நல அறிவிப்பு"
   );
 
   if (client.questionnaire) {
@@ -2692,13 +2701,13 @@ async function downloadConsentPdf(
     );
   } else {
     field(
-      "Answers",
+      "Answers / பதில்கள்",
       "No health declaration answers recorded."
     );
   }
 
   field(
-    "If yes, specify",
+    "If yes, specify / ஆம் எனில் குறிப்பிடவும்",
     client.notes
   );
 
@@ -2711,7 +2720,7 @@ async function downloadConsentPdf(
   pdf.setTextColor(0, 0, 0);
   // Larger font for readability
   pdf.setFontSize(12);
-  section("Consent & Acknowledgment");
+  section("Consent & Acknowledgment / ஒப்புதல் மற்றும் அங்கீகாரம்");
 
   const dynamicContent = {
     Tattoo: {
@@ -2822,15 +2831,15 @@ async function downloadConsentPdf(
     y += 3; // Space between items
   });
 
-  section("Signatures");
+  section("Signatures / கையொப்பங்கள்");
   ensureSpace(45);
   addSignature(
-    "Customer Signature",
+    "Customer Signature / வாடிக்கையாளர் கையொப்பம்",
     client.customer_signature,
     margin
   );
   addSignature(
-    "Artist Signature",
+    "Artist Signature / கலைஞர் கையொப்பம்",
     client.artist_signature,
     pageWidth / 2 + 5
   );
