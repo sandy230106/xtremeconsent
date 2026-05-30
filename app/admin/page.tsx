@@ -2296,34 +2296,111 @@ async function downloadConsentPdf(
     }
   };
 
+  const drawTamilText = (
+    textStr: string,
+    x: number,
+    yPos: number,
+    fontSize: number,
+    isBold = false,
+    color = "#111111",
+    maxWidth = contentWidth
+  ): number => {
+    if (!containsTamil(textStr)) {
+      const r = color.startsWith("#") ? parseInt(color.slice(1,3), 16) : 0;
+      const g = color.startsWith("#") ? parseInt(color.slice(3,5), 16) : 0;
+      const b = color.startsWith("#") ? parseInt(color.slice(5,7), 16) : 0;
+      pdf.setTextColor(r, g, b);
+      setPdfFont("helvetica", isBold ? "bold" : "normal");
+      pdf.setFontSize(fontSize);
+      const cleanLine = textStr.replace(/[^\x00-\x7F]/g, "");
+      pdf.text(cleanLine, x, yPos);
+      return fontSize * 0.35 + 1.5; // spacing in mm
+    }
+
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return 0;
+
+    const scale = 4;
+    const fontName = 'Inter, "Noto Sans Tamil", "Segoe UI", sans-serif';
+    ctx.font = `${isBold ? "bold" : "normal"} ${fontSize * scale}px ${fontName}`;
+
+    // Split text into words and wrap
+    const words = textStr.split(" ");
+    const lines: string[] = [];
+    let currentLine = "";
+    const maxPxWidth = maxWidth * 3.7795 * scale;
+
+    for (let i = 0; i < words.length; i++) {
+      const testLine = currentLine ? currentLine + " " + words[i] : words[i];
+      const testWidth = ctx.measureText(testLine).width;
+      if (testWidth > maxPxWidth && i > 0) {
+        lines.push(currentLine);
+        currentLine = words[i];
+      } else {
+        currentLine = testLine;
+      }
+    }
+    if (currentLine) {
+      lines.push(currentLine);
+    }
+
+    let currentY = yPos;
+    const spacingMm = (fontSize * 0.35) + 1.8;
+
+    lines.forEach((line) => {
+      const lineCanvas = document.createElement("canvas");
+      const lineCtx = lineCanvas.getContext("2d");
+      if (!lineCtx) return;
+
+      const lineFontPx = fontSize * scale;
+      lineCtx.font = `${isBold ? "bold" : "normal"} ${lineFontPx}px ${fontName}`;
+      
+      const textWidth = lineCtx.measureText(line).width;
+      const pad = 10;
+      
+      lineCanvas.width = textWidth + pad * 2;
+      lineCanvas.height = lineFontPx * 1.4;
+
+      lineCtx.font = `${isBold ? "bold" : "normal"} ${lineFontPx}px ${fontName}`;
+      lineCtx.textBaseline = "middle";
+      lineCtx.fillStyle = color;
+      
+      lineCtx.imageSmoothingEnabled = true;
+      lineCtx.imageSmoothingQuality = "high";
+
+      lineCtx.fillText(line, pad, lineCanvas.height / 2 + 1);
+
+      const imgDataUrl = lineCanvas.toDataURL("image/png");
+      const widthMm = lineCanvas.width / (scale * 3.7795);
+      const heightMm = lineCanvas.height / (scale * 3.7795);
+
+      try {
+        pdf.addImage(imgDataUrl, "PNG", x, currentY - heightMm + (fontSize * 0.22), widthMm, heightMm);
+      } catch (e) {
+        console.error("Failed to add canvas image for Tamil text:", e);
+      }
+
+      currentY += spacingMm;
+    });
+
+    return lines.length * spacingMm;
+  };
+
   const safeText = (
     textLines: string | string[],
     x: number,
     yPos: number,
     fontSize: number,
-    style: "normal" | "bold" = "normal"
+    style: "normal" | "bold" = "normal",
+    color = "#111111"
   ) => {
     const lines = Array.isArray(textLines) ? textLines.map(l => String(l || "")) : [String(textLines || "")];
-    lines.forEach((line, i) => {
-      const lineY = yPos + i * 5;
-      if (hasTamilFont && containsTamil(line)) {
-        setPdfFont("Lohit-Tamil", "normal");
-        pdf.setFontSize(fontSize - 1);
-        try {
-          pdf.text(line, x, lineY);
-        } catch (e) {
-          console.warn("Tamil text draw failed, falling back to helvetica clean text:", e);
-          setPdfFont("helvetica", style);
-          pdf.setFontSize(fontSize);
-          const cleanLine = line.replace(/[^\x00-\x7F]/g, "");
-          pdf.text(cleanLine, x, lineY);
-        }
-      } else {
-        const cleanLine = line.replace(/[^\x00-\x7F]/g, ""); // Strip non-ASCII to prevent jsPDF crash
-        setPdfFont("helvetica", style);
-        pdf.setFontSize(fontSize);
-        pdf.text(cleanLine, x, lineY);
-      }
+    let currentY = yPos;
+    lines.forEach((line) => {
+      const isBold = style === "bold";
+      const heightUsed = drawTamilText(line, x, currentY, fontSize, isBold, color, pageWidth - margin - x);
+      currentY += heightUsed;
     });
   };
 
@@ -2447,8 +2524,8 @@ async function downloadConsentPdf(
     const enLines = safeSplitText(enText, contentWidth - 28);
     
     let taLines: string[] = [];
-    if (hasTamilFont && questionTa) {
-      taLines = safeSplitText(`   ${questionTa}`, contentWidth - 32);
+    if (questionTa) {
+      taLines = [questionTa];
     }
     
     const enHeight = enLines.length * 5;
@@ -2457,20 +2534,13 @@ async function downloadConsentPdf(
 
     ensureSpace(height);
 
-    safeText(enLines, margin, y, 9.5, "bold");
-    safeText(translateAnswer(answer), pageWidth - margin - 25, y, 9.5, "bold");
+    safeText(enLines, margin, y, 9.5, "bold", "#111111");
+    safeText(translateAnswer(answer), pageWidth - margin - 25, y, 9.5, "bold", "#111111");
 
     y += enHeight + 1;
 
-    if (hasTamilFont && taLines.length > 0) {
-      setPdfFont("Lohit-Tamil", "normal");
-      pdf.setFontSize(8);
-      pdf.setTextColor(100, 100, 100);
-      try {
-        pdf.text(taLines, margin + 2, y);
-      } catch (e) {
-        console.warn("Tamil text question rendering failed:", e);
-      }
+    if (taLines.length > 0) {
+      safeText(taLines, margin + 2, y, 8.5, "bold", "#333333");
       y += taHeight;
     }
 
@@ -2889,10 +2959,9 @@ async function downloadConsentPdf(
     const enText = `${index + 1}. ${item.en}`;
     const enLines = safeSplitText(enText, contentWidth);
     
-    const taText = `    ${item.ta}`;
     let taLines: string[] = [];
-    if (hasTamilFont) {
-      taLines = safeSplitText(taText, contentWidth - 4);
+    if (item.ta) {
+      taLines = [item.ta];
     }
 
     const enHeight = enLines.length * 5;
@@ -2902,15 +2971,12 @@ async function downloadConsentPdf(
     ensureSpace(totalHeight);
 
     // Draw English
-    safeText(enLines, margin, y, 9.5, "normal");
+    safeText(enLines, margin, y, 9.5, "normal", "#111111");
     y += enHeight + 1.5;
 
     // Draw Tamil
-    if (hasTamilFont && taLines.length > 0) {
-      pdf.setFont("Lohit-Tamil", "normal");
-      pdf.setFontSize(8.5);
-      pdf.setTextColor(80, 80, 80); // Subtle charcoal for translation
-      pdf.text(taLines, margin + 2, y);
+    if (taLines.length > 0) {
+      safeText(taLines, margin + 4, y, 8.5, "bold", "#333333");
       y += taHeight;
     }
 
@@ -2960,10 +3026,9 @@ async function downloadConsentPdf(
     const enText = `${index + 1}. ${item.en}`;
     const enLines = safeSplitText(enText, contentWidth);
     
-    const taText = `    ${item.ta}`;
     let taLines: string[] = [];
-    if (hasTamilFont) {
-      taLines = safeSplitText(taText, contentWidth - 4);
+    if (item.ta) {
+      taLines = [item.ta];
     }
 
     const enHeight = enLines.length * 5;
@@ -2973,15 +3038,12 @@ async function downloadConsentPdf(
     ensureSpace(totalHeight);
 
     // Draw English
-    safeText(enLines, margin, y, 9.5, "normal");
+    safeText(enLines, margin, y, 9.5, "normal", "#111111");
     y += enHeight + 1.5;
 
     // Draw Tamil
-    if (hasTamilFont && taLines.length > 0) {
-      pdf.setFont("Lohit-Tamil", "normal");
-      pdf.setFontSize(8.5);
-      pdf.setTextColor(80, 80, 80); // Subtle charcoal for translation
-      pdf.text(taLines, margin + 2, y);
+    if (taLines.length > 0) {
+      safeText(taLines, margin + 4, y, 8.5, "bold", "#333333");
       y += taHeight;
     }
 
