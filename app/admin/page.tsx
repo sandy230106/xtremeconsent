@@ -3077,24 +3077,38 @@ async function downloadConsentPdf(
     const enText = `${index + 1}. ${item.en}`;
     const enLines = safeSplitText(enText, contentWidth);
     
-    const enHeight = safeText(enLines, margin, y, 12, "bold", "#000000", true);
-    const taHeight = item.ta ? safeText([item.ta], margin + 4, y, 11, "bold", "#222222", true) : 0;
-    const totalHeight = enHeight + (item.ta ? taHeight + 2 : 0) + 5;
+    const enHeight = safeText(enLines, margin, y, 11, "bold", "#000000", true);
+    const taHeight = item.ta ? safeText([item.ta], margin + 4, y, 10, "bold", "#222222", true) : 0;
+    const totalHeight = enHeight + (item.ta ? taHeight + 1.5 : 0) + 4.5;
 
     ensureSpace(totalHeight);
 
-    // Draw English: bold, 12pt, pure black
-    safeText(enLines, margin, y, 12, "bold", "#000000");
-    y += enHeight + 2.0;
+    // Draw English: bold, 11pt, pure black
+    safeText(enLines, margin, y, 11, "bold", "#000000");
+    y += enHeight + 1.5;
 
-    // Draw Tamil: bold, 11pt, dark charcoal
+    // Draw Tamil: bold, 10pt, dark charcoal
     if (item.ta) {
-      safeText([item.ta], margin + 4, y, 11, "bold", "#222222");
+      safeText([item.ta], margin + 4, y, 10, "bold", "#222222");
       y += taHeight;
     }
 
-    y += 8.0; // Space between items - expanded to use the page beautifully since signatures are removed
+    y += 4.5; // Space between items
   });
+
+  // Signatures on Page 4
+  section("Signature Verification / கையொப்பம் சரிபார்ப்பு");
+  ensureSpace(38);
+  addSignature(
+    "Customer Signature / வாடிக்கையாளர் கையொப்பம்",
+    client.customer_signature,
+    margin
+  );
+  addSignature(
+    "Artist Signature / கலைஞர் கையொப்பம்",
+    client.artist_signature,
+    pageWidth / 2 + 5
+  );
 
   const fileName =
     `${client.name || "client"}-consent.pdf`.replace(
