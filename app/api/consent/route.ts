@@ -7,10 +7,24 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   try {
     const tableName = process.env.DYNAMODB_TABLE_CONSENT_FORMS || "consent_forms";
-    const data = await ddbDocClient.send(new ScanCommand({ TableName: tableName }));
+    
+    let items: any[] = [];
+    let lastEvaluatedKey: any = undefined;
+    
+    do {
+      const params: any = { TableName: tableName };
+      if (lastEvaluatedKey) {
+        params.ExclusiveStartKey = lastEvaluatedKey;
+      }
+      
+      const data = await ddbDocClient.send(new ScanCommand(params));
+      if (data.Items) {
+        items = items.concat(data.Items);
+      }
+      lastEvaluatedKey = data.LastEvaluatedKey;
+    } while (lastEvaluatedKey);
     
     // Sort items by created_at descending in-memory
-    const items = data.Items || [];
     items.sort((a, b) => {
       const dateA = new Date(a.created_at || 0).getTime();
       const dateB = new Date(b.created_at || 0).getTime();
